@@ -24,7 +24,7 @@ This document records:
 3. how livemix, mafia and army each wire it up and what each deletes;
 4. the decisions behind the API's shape, and the questions left open.
 
-Once implemented, the crate docs (`src/lib.rs` and the items' own docs) are
+The API sketches in section 2 match the crate as built. The crate docs (`src/lib.rs` and the items' own docs) are
 authoritative for the details, written in terms of behaviour rather than of
 the apps it came from; this document explains why the API is shaped as it is.
 
@@ -177,7 +177,7 @@ phrasebook ships no components and no hooks. The context type is the handle
 itself, so an app provides it with yew's own `ContextProvider<Phrases>` and a
 component reads it with yew's own `use_context::<Phrases>()`, or
 `ctx.link().context::<Phrases>(callback)` in a struct component. What
-`yew023` adds is trait impls on `Phrases` (and `Lang`) and two plain
+`yew023` adds is trait impls on `Phrases` (and `Lang` and `Language`) and two plain
 functions for when no handle is provided (2.10).
 
 None of that needs yew's macros (`html!`, `#[function_component]`,
@@ -193,9 +193,9 @@ No feature is on by default.
 | Feature | Enables | Pulls in |
 |---|---|---|
 | *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
-| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store` | web-sys, wasm-bindgen |
+| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store` | web-sys (on wasm32 only) |
 | `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.1 (as `koine01`, feature `locale`) |
-| `yew023` | `phrasebook::yew023`: trait impls on `Phrases` and `Lang`, the no-provider helpers | yew 0.23 (as `yew023`) |
+| `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the no-provider helpers | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
 that appears in the public API is named after its version. fluent (0.17,
@@ -242,7 +242,11 @@ behind `koine01`, where `Lang` converts to and from koine's `Locale`,
 ```rust
 /// One language's `.ftl` source, embedded in the binary.
 pub struct Source { /* lang, ftl */ }
-impl Source { pub const fn new(lang: Lang, ftl: &'static str) -> Source; }
+impl Source {
+    pub const fn new(lang: Lang, ftl: &'static str) -> Source;
+    pub const fn lang(&self) -> Lang;
+    pub const fn ftl(&self) -> &'static str;
+}
 
 /// Everything one crate ships: its name, the prefix every message id it
 /// defines must start with (if any), and one source per language.
@@ -250,7 +254,13 @@ pub struct Catalog { /* name, prefix, sources */ }
 impl Catalog {
     pub const fn new(name: &'static str, sources: &'static [Source]) -> Catalog;
     pub const fn with_prefix(self, prefix: &'static str) -> Catalog;
+    pub const fn name(&self) -> &'static str;
+    pub const fn prefix(&self) -> Option<&'static str>;
+    pub const fn sources(&self) -> &'static [Source];
+    /// The first source's language.
+    pub fn default_lang(&self) -> Option<Lang>;
     pub fn languages(&self) -> impl Iterator<Item = Lang>;
+    pub fn source(&self, lang: Lang) -> Option<&'static Source>;
 }
 ```
 
@@ -288,6 +298,8 @@ impl Phrasebook {
     pub fn phrases(&self, lang: Lang) -> Phrases;
     pub fn languages(&self) -> &[Language];
     pub fn fallback(&self) -> Lang;
+    /// Whether `lang` is declared.
+    pub fn supports(&self, lang: Lang) -> bool;
     /// The best declared language for a list of preferred tags, most
     /// preferred first: an exact match, then the first declared language
     /// with the same primary subtag, then the fallback.
@@ -295,7 +307,9 @@ impl Phrasebook {
 }
 
 /// A supported language and its name in itself, for a language picker.
+#[non_exhaustive]
 pub struct Language { pub lang: Lang, pub name: &'static str }
+impl Language { pub const fn new(lang: Lang, name: &'static str) -> Language; }
 
 impl Builder {
     /// Declare a supported language, in picker order. The first is the
@@ -345,6 +359,7 @@ impl Phrases {
 
     pub fn lang(&self) -> Lang;
     pub fn languages(&self) -> &[Language];
+    pub fn phrasebook(&self) -> &Phrasebook;
     /// The same bundles in another language; an app's root calls this on a
     /// language change and provides the result.
     pub fn with_lang(&self, lang: Lang) -> Phrases;
@@ -373,7 +388,9 @@ and `args` are renamed (section 3).
 
 **Lookup.** A message is formatted in the first of these that defines it:
 the handle's language; the fallback language; the handle's backstop catalog,
-if it has one (`with_backstop`, used by `or_catalog` in 2.10); and otherwise
+if it has one (`with_backstop`, used by `or_catalog` in 2.10), in the
+handle's language when the catalog has a source for it and in the catalog's
+default language otherwise; and otherwise
 the result is the id itself, so the hole is
 visible on the page rather than blank. Each miss (the handle's language
 lacking a message, or every bundle lacking it) is logged once per id and
@@ -478,7 +495,7 @@ pub mod koine01 {
     pub fn is_known(lang: Lang) -> bool;
     /// koine's English reference name of the language ("Swedish").
     pub fn name(lang: Lang) -> Option<&'static str>;
-    pub struct Error;
+    pub struct Error; // Display, std::error::Error
 }
 ```
 
@@ -507,6 +524,12 @@ pub mod check {
     pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems>;
     /// The message ids a catalog defines in one language, in file order.
     pub fn ids(catalog: &Catalog, lang: Lang) -> Vec<String>;
+
+    /// Every problem found, each naming its catalog and language; `Display`
+    /// lists them one per line, so `check::catalog(&L10N).unwrap()` fails a
+    /// test with all of them.
+    pub struct Problems;
+    pub struct Problem; // catalog(), lang(), message()
 }
 ```
 
@@ -528,9 +551,11 @@ pub mod yew023 {
     // cheap values.
     impl ImplicitClone for Phrases {}
     impl ImplicitClone for Lang {}
-    // `IntoPropValue` impls where a call site shows the need (`Lang` into
-    // `AttrValue` for a `lang` attribute, say). `text`'s `Rc<str>` already
+    impl ImplicitClone for Language {}
+    // For an element's `lang` attribute. `text`'s `Rc<str>` already
     // converts into `AttrValue` and into children.
+    impl IntoPropValue<AttrValue> for Lang {}
+    impl IntoPropValue<Option<AttrValue>> for Lang {}
 
     /// The provided handle, or `Phrases::empty()` (renders ids) with one
     /// warning per thread.

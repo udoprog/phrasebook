@@ -217,6 +217,37 @@ impl Builder {
         self
     }
 
+    /// Declare a supported language named by koine's English reference
+    /// name, such as `"Swedish"` for `sv-SE`, for an app with no name of
+    /// the language in itself to hand. The region is not part of the name,
+    /// so an app declaring two regions of one language should name them
+    /// itself with [`Builder::language`].
+    ///
+    /// A language koine does not know is named by its tag (a string leaked
+    /// once per call, so declare it with [`Builder::language`] instead), and
+    /// [`Builder::build`] warns about it.
+    ///
+    /// ```
+    /// use phrasebook::{Lang, Phrasebook};
+    ///
+    /// let book = Phrasebook::builder()
+    ///     .language_named_by_koine(Lang::new("sv-SE"))
+    ///     .language(Lang::EN_US, "English")
+    ///     .build();
+    ///
+    /// assert_eq!(book.languages()[0].name, "Swedish");
+    /// ```
+    #[cfg(feature = "koine01")]
+    #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "koine01")))]
+    pub fn language_named_by_koine(self, lang: Lang) -> Self {
+        let name = match crate::koine01::name(lang) {
+            Some(name) => name,
+            None => Box::leak(lang.to_string().into_boxed_str()),
+        };
+
+        self.language(lang, name)
+    }
+
     /// Set the fallback language. It should be declared; if it is not, it
     /// still gets a bundle but is not listed in
     /// [`Phrasebook::languages`].
@@ -246,7 +277,18 @@ impl Builder {
     }
 
     /// Build the phrasebook. Nothing is parsed yet.
+    ///
+    /// With the `koine01` feature, a declared language koine does not know
+    /// (see [`koine01::is_known`](crate::koine01::is_known)) is logged as a
+    /// warning.
     pub fn build(self) -> Phrasebook {
+        #[cfg(feature = "koine01")]
+        for language in &self.languages {
+            if !crate::koine01::is_known(language.lang) {
+                tracing::warn!(lang = %language.lang, "phrasebook: koine does not know the declared language");
+            }
+        }
+
         let fallback = self
             .fallback
             .or_else(|| self.languages.first().map(|l| l.lang))

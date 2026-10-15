@@ -139,6 +139,43 @@ impl Lang {
         Some(Lang { language, region })
     }
 
+    /// Build from a language code of two or three ASCII letters and an
+    /// optional region of two, in any case. Returns `None` for any other
+    /// shape.
+    #[cfg(feature = "koine01")]
+    pub(crate) fn from_parts(language: &str, region: Option<&str>) -> Option<Lang> {
+        let language_bytes = language.as_bytes();
+
+        if !(2..=3).contains(&language_bytes.len())
+            || !language_bytes.iter().all(u8::is_ascii_alphabetic)
+        {
+            return None;
+        }
+
+        let mut lang = Lang {
+            language: [0; 3],
+            region: [0; 2],
+        };
+
+        for (to, from) in lang.language.iter_mut().zip(language_bytes) {
+            *to = from.to_ascii_lowercase();
+        }
+
+        if let Some(region) = region {
+            let &[a, b] = region.as_bytes() else {
+                return None;
+            };
+
+            if !a.is_ascii_alphabetic() || !b.is_ascii_alphabetic() {
+                return None;
+            }
+
+            lang.region = [a.to_ascii_uppercase(), b.to_ascii_uppercase()];
+        }
+
+        Some(lang)
+    }
+
     /// The language subtag, such as `"sv"`.
     pub fn language(&self) -> &str {
         let len = self.language.iter().position(|&b| b == 0).unwrap_or(3);

@@ -570,3 +570,63 @@ fn check_parity_and_ids() {
 
     assert!(check::parity(&LIB, Lang::new("fr")).is_err());
 }
+
+#[cfg(feature = "koine01")]
+#[test]
+fn koine01_warns_about_unknown_languages() {
+    let warnings = Warnings::default();
+
+    with_default(warnings.clone(), || {
+        let _ = Phrasebook::builder()
+            .language(Lang::EN_US, "English")
+            .language(Lang::new("sv"), "Svenska")
+            .language(Lang::new("fil-PH"), "Filipino")
+            .build();
+    });
+
+    assert_eq!(warnings.count(), 0);
+
+    with_default(warnings.clone(), || {
+        let _ = Phrasebook::builder()
+            .language(Lang::EN_US, "English")
+            .language(Lang::new("xx"), "Unknown")
+            .language(Lang::new("sv-JP"), "Svenska")
+            .language(Lang::new("en-ZZ"), "English")
+            .build();
+    });
+
+    assert_eq!(warnings.count(), 3);
+}
+
+#[cfg(feature = "koine01")]
+#[test]
+fn koine01_language_named_by_koine() {
+    let warnings = Warnings::default();
+
+    let book = with_default(warnings.clone(), || {
+        Phrasebook::builder()
+            .language_named_by_koine(SV_SE)
+            .language_named_by_koine(Lang::new("fil"))
+            .language_named_by_koine(Lang::new("xx-YY"))
+            // Already declared: keeps its name.
+            .language_named_by_koine(SV_SE)
+            .build()
+    });
+
+    let names = book
+        .languages()
+        .iter()
+        .map(|l| (l.lang, l.name))
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        names,
+        [
+            (SV_SE, "Swedish"),
+            (Lang::new("fil"), "Filipino"),
+            (Lang::new("xx-YY"), "xx-YY"),
+        ]
+    );
+    assert_eq!(book.fallback(), SV_SE);
+    assert_eq!(warnings.count(), 1);
+}

@@ -26,6 +26,7 @@ rustdoc-args = ["--cfg", "phrasebook_docsrs"]
 default = []
 browser = ["dep:web-sys"]
 yew023 = ["dep:yew023"]
+koine01 = ["dep:koine01"]
 
 [dependencies]
 fluent-bundle = "0.16.0"
@@ -35,6 +36,7 @@ tracing = "0.1.44"
 # yew in the API (trait impls on `Phrases` and `Lang`), named after its
 # version. The library uses none of yew's macros, which expand to `::yew::`.
 yew023 = { package = "yew", version = "0.23.0", optional = true }
+koine01 = { package = "koine", version = "0.1.0", path = "../koine", default-features = false, features = ["locale"], optional = true }
 
 # browser: only used on wasm32; elsewhere its functions return nothing.
 [target.'cfg(target_arch = "wasm32")'.dependencies]

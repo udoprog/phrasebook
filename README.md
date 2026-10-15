@@ -30,6 +30,7 @@ marked with it.
 | *(none)* | | [`Lang`], [`Catalog`], [`Source`], [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
 | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, and `Phrases::store` |
 | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
+| `koine01` | [`koine01`] | conversions between [`Lang`] and koine 0.1's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |
 
 Fluent and unic-langid are used underneath but appear nowhere in the
 API, so upgrading them is never a breaking change. A dependency that is
@@ -118,6 +119,7 @@ module documents both forms in full, struct components included.
 [`Catalog`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Catalog.html
 [`check`]: https://docs.rs/phrasebook/latest/phrasebook/check/index.html
 [`docs/design.md`]: https://github.com/udoprog/phrasebook/blob/main/docs/design.md
+[`koine01`]: https://docs.rs/phrasebook/latest/phrasebook/koine01/index.html
 [`Lang`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Lang.html
 [`or_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_catalog.html
 [`or_default`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_default.html

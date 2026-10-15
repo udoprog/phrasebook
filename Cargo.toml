@@ -1,0 +1,37 @@
+[package]
+name = "phrasebook"
+version = "0.1.0"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
+edition = "2024"
+description = "Fluent localization for Rust web frontends: message catalogs per language, arguments and plurals, a remembered language choice in the browser."
+documentation = "https://docs.rs/phrasebook"
+readme = "README.md"
+repository = "https://github.com/udoprog/phrasebook"
+license = "MIT OR Apache-2.0"
+keywords = ["fluent", "i18n", "l10n", "localization", "wasm"]
+categories = ["internationalization", "localization", "wasm", "web-programming"]
+include = ["/src/**", "/README.md", "/LICENSE-*", "/Cargo.toml"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(phrasebook_docsrs)'] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "phrasebook_docsrs"]
+
+# No feature is on by default. fluent and unic-langid are pre-1.0 and stay out
+# of the public API, so upgrading them is an internal change. A dependency that
+# is not yet 1.0 and appears in the API is named after its version (`yew023`).
+[features]
+default = []
+browser = ["dep:web-sys"]
+
+[dependencies]
+fluent-bundle = "0.16.0"
+fluent-syntax = "0.12.0"
+unic-langid = "0.9.6"
+tracing = "0.1.44"
+
+# browser: only used on wasm32; elsewhere its functions return nothing.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3.77", features = ["Window", "Navigator", "Storage"], optional = true }

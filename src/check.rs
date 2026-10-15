@@ -1,0 +1,353 @@
+//! Checks of a catalog, for an app's or a library's tests.
+//!
+//! ```
+//! use phrasebook::{Catalog, Lang, Source, check};
+//!
+//! const SV_SE: Lang = Lang::new("sv-SE");
+//!
+//! static L10N: Catalog = Catalog::new("app", &[
+//!     Source::new(Lang::EN_US, "hello = Hello\nitems = { $count ->\n    [one] One item\n   *[other] { $count } items\n}\n"),
+//!     Source::new(SV_SE, "hello = Hej\nitems = { $count ->\n    [one] En sak\n   *[other] { $count } saker\n}\n"),
+//! ]);
+//!
+//! check::catalog(&L10N).unwrap();
+//! check::parity(&L10N, SV_SE).unwrap();
+//! assert_eq!(check::ids(&L10N, SV_SE), ["hello", "items"]);
+//! ```
+//!
+//! A failing check lists every problem it found:
+//!
+//! ```
+//! use phrasebook::{Catalog, Lang, Source, check};
+//!
+//! static LIB: Catalog = Catalog::new("lib", &[
+//!     Source::new(Lang::EN_US, "lib-a = A\nlib-a = Again\nb = B\n"),
+//! ])
+//! .with_prefix("lib-");
+//!
+//! let problems = check::catalog(&LIB).unwrap_err();
+//! assert_eq!(problems.to_string(), "\
+//! lib en-US: `lib-a` is defined twice
+//! lib en-US: `b` does not start with the catalog's prefix `lib-`");
+//! ```
+
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+
+use fluent_bundle::{FluentArgs, FluentResource, FluentValue};
+use fluent_syntax::ast;
+
+use crate::phrasebook::{entry_id, new_bundle, parse};
+use crate::{Catalog, Lang, Source};
+
+/// Every source parses; no language has two sources; no id is defined
+/// twice in a source; every id has the catalog's prefix; and every message
+/// and attribute formats without errors, given a placeholder for every
+/// variable the source mentions.
+pub fn catalog(catalog: &Catalog) -> Result<(), Problems> {
+    let mut problems = Problems::default();
+    let mut langs = HashSet::new();
+
+    for source in catalog.sources() {
+        let lang = source.lang();
+        let mut report = |message: String| problems.push(catalog, lang, message);
+
+        if !langs.insert(lang) {
+            report("a second source for this language, which is ignored".to_owned());
+            continue;
+        }
+
+        check_source(catalog, source, &mut report);
+    }
+
+    problems.into_result()
+}
+
+fn check_source(catalog: &Catalog, source: &Source, report: &mut dyn FnMut(String)) {
+    let resource = parse(source, |line, error| {
+        report(format!("syntax error on line {line}: {error}"));
+    });
+
+    let mut seen = HashSet::new();
+
+    for (key, name) in resource.entries().filter_map(entry_id) {
+        if !seen.insert(key.clone()) {
+            report(format!("`{key}` is defined twice"));
+        }
+
+        if !catalog.owns(name) {
+            let prefix = catalog.prefix().unwrap_or_default();
+            report(format!(
+                "`{key}` does not start with the catalog's prefix `{prefix}`"
+            ));
+        }
+    }
+
+    // Placeholders for every variable the source mentions: message
+    // references share their caller's arguments, so a message's own
+    // variables are not enough.
+    let mut variables = Vec::new();
+
+    for entry in resource.entries() {
+        if let ast::Entry::Message(message) = entry {
+            if let Some(pattern) = &message.value {
+                pattern_variables(pattern, &mut variables);
+            }
+
+            for attribute in &message.attributes {
+                pattern_variables(&attribute.value, &mut variables);
+            }
+        }
+    }
+
+    let mut args = FluentArgs::new();
+
+    for name in variables {
+        args.set(name.to_owned(), FluentValue::from(1));
+    }
+
+    let ids = resource
+        .entries()
+        .filter_map(|entry| match entry {
+            ast::Entry::Message(m) => Some(m.id.name.to_owned()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    let mut bundle = new_bundle(source.lang(), false);
+    // Duplicates are reported above.
+    let _ = bundle.add_resource(resource);
+
+    let mut reported = HashSet::new();
+
+    for id in ids {
+        if !reported.insert(id.clone()) {
+            continue;
+        }
+
+        let Some(message) = bundle.get_message(&id) else {
+            continue;
+        };
+
+        let patterns = message
+            .value()
+            .map(|p| (None, p))
+            .into_iter()
+            .chain(message.attributes().map(|a| (Some(a.id()), a.value())));
+
+        for (attribute, pattern) in patterns {
+            let mut errors = Vec::new();
+            let _ = bundle.format_pattern(pattern, Some(&args), &mut errors);
+
+            let name = match attribute {
+                Some(attribute) => format!("{id}.{attribute}"),
+                None => id.clone(),
+            };
+
+            for error in errors {
+                report(format!("`{name}` does not format: {error}"));
+            }
+        }
+    }
+}
+
+/// `lang` defines exactly the message ids of the catalog's default
+/// language (its first source). Terms are a translation's own business and
+/// are not compared.
+pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems> {
+    let mut problems = Problems::default();
+
+    let Some(default) = catalog.default_lang() else {
+        problems.push(catalog, lang, "the catalog has no sources".to_owned());
+        return problems.into_result();
+    };
+
+    if catalog.source(lang).is_none() {
+        problems.push(catalog, lang, "no source for this language".to_owned());
+        return problems.into_result();
+    }
+
+    let expected = ids(catalog, default);
+    let actual = ids(catalog, lang);
+
+    let expected_set = expected.iter().collect::<HashSet<_>>();
+    let actual_set = actual.iter().collect::<HashSet<_>>();
+
+    for id in &expected {
+        if !actual_set.contains(id) {
+            problems.push(
+                catalog,
+                lang,
+                format!("`{id}` is missing (defined in {default})"),
+            );
+        }
+    }
+
+    for id in &actual {
+        if !expected_set.contains(id) {
+            problems.push(catalog, lang, format!("`{id}` is not defined in {default}"));
+        }
+    }
+
+    problems.into_result()
+}
+
+/// The message ids a catalog defines in `lang`, in file order, each once.
+/// Empty if the catalog has no source for `lang`. Whatever parses is
+/// listed, so a source with syntax errors still lists the rest.
+pub fn ids(catalog: &Catalog, lang: Lang) -> Vec<String> {
+    let Some(source) = catalog.source(lang) else {
+        return Vec::new();
+    };
+
+    let resource: FluentResource = parse(source, |_, _| {});
+    let mut seen = HashMap::new();
+    let mut out = Vec::new();
+
+    for entry in resource.entries() {
+        if let ast::Entry::Message(m) = entry
+            && seen.insert(m.id.name, ()).is_none()
+        {
+            out.push(m.id.name.to_owned());
+        }
+    }
+
+    out
+}
+
+fn pattern_variables<'s>(pattern: &ast::Pattern<&'s str>, out: &mut Vec<&'s str>) {
+    for element in &pattern.elements {
+        if let ast::PatternElement::Placeable { expression } = element {
+            expression_variables(expression, out);
+        }
+    }
+}
+
+fn expression_variables<'s>(expression: &ast::Expression<&'s str>, out: &mut Vec<&'s str>) {
+    match expression {
+        ast::Expression::Select { selector, variants } => {
+            inline_variables(selector, out);
+
+            for variant in variants {
+                pattern_variables(&variant.value, out);
+            }
+        }
+        ast::Expression::Inline(inline) => inline_variables(inline, out),
+    }
+}
+
+fn inline_variables<'s>(inline: &ast::InlineExpression<&'s str>, out: &mut Vec<&'s str>) {
+    match inline {
+        ast::InlineExpression::VariableReference { id } => {
+            if !out.contains(&id.name) {
+                out.push(id.name);
+            }
+        }
+        ast::InlineExpression::FunctionReference { arguments, .. } => {
+            for argument in &arguments.positional {
+                inline_variables(argument, out);
+            }
+
+            for argument in &arguments.named {
+                inline_variables(&argument.value, out);
+            }
+        }
+        ast::InlineExpression::Placeable { expression } => expression_variables(expression, out),
+        // A term's arguments are its own scope.
+        _ => {}
+    }
+}
+
+/// The problems a check found, one per line when displayed.
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct Problems {
+    problems: Vec<Problem>,
+}
+
+impl Problems {
+    fn push(&mut self, catalog: &Catalog, lang: Lang, message: String) {
+        self.problems.push(Problem {
+            catalog: catalog.name().to_owned(),
+            lang,
+            message,
+        });
+    }
+
+    fn into_result(self) -> Result<(), Problems> {
+        if self.problems.is_empty() {
+            Ok(())
+        } else {
+            Err(self)
+        }
+    }
+
+    /// The problems, in the order found.
+    pub fn iter(&self) -> impl Iterator<Item = &Problem> {
+        self.problems.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a Problems {
+    type Item = &'a Problem;
+    type IntoIter = std::slice::Iter<'a, Problem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.problems.iter()
+    }
+}
+
+impl fmt::Display for Problems {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (n, problem) in self.problems.iter().enumerate() {
+            if n > 0 {
+                writeln!(f)?;
+            }
+
+            problem.fmt(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Lists the problems as [`Display`](fmt::Display) does, so a failed
+/// `unwrap()` in a test reads well.
+impl fmt::Debug for Problems {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f)?;
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl core::error::Error for Problems {}
+
+/// One problem a check found, in one catalog and language.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Problem {
+    catalog: String,
+    lang: Lang,
+    message: String,
+}
+
+impl Problem {
+    /// The name of the catalog it is in.
+    pub fn catalog(&self) -> &str {
+        &self.catalog
+    }
+
+    /// The language of the source it is in.
+    pub fn lang(&self) -> Lang {
+        self.lang
+    }
+
+    /// What is wrong.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+impl fmt::Display for Problem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}: {}", self.catalog, self.lang, self.message)
+    }
+}

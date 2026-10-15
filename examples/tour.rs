@@ -113,9 +113,9 @@ fn main() {
         phrases.msg("auth-signed-in-as", &args!(name = "Ada"))
     );
 
-    // What an app's tests assert. The parity check reports that Swedish
-    // lacks `nights`, and that it defines `auth-sign-in`, the app's
-    // translation of a library message, which the app's English does not.
+    // What an app's tests assert. Swedish also translates `auth-sign-in`,
+    // which the app's English lacks: naming the library's catalog accepts
+    // it, so parity reports only that Swedish lacks `nights`.
     println!();
     println!("Checks:");
     println!("  app catalog: {:?}", check::catalog(&APP).map(|()| "ok"));
@@ -124,7 +124,7 @@ fn main() {
         check::catalog(&auth::L10N).map(|()| "ok")
     );
 
-    if let Err(problems) = check::parity(&APP, SV_SE) {
+    if let Err(problems) = check::parity_with(&APP, SV_SE, &[&auth::L10N]) {
         println!("  sv-SE parity:");
 
         for problem in &problems {

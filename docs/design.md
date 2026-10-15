@@ -522,6 +522,13 @@ pub mod check {
     pub fn catalog(catalog: &Catalog) -> Result<(), Problems>;
     /// `lang` defines exactly the ids of the catalog's default language.
     pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems>;
+    /// As `parity`, but an id in `lang` the default language lacks is
+    /// accepted when one of `libraries` defines it in its default language.
+    pub fn parity_with(
+        catalog: &Catalog,
+        lang: Lang,
+        libraries: &[&Catalog],
+    ) -> Result<(), Problems>;
     /// The message ids a catalog defines in one language, in file order.
     pub fn ids(catalog: &Catalog, lang: Lang) -> Vec<String>;
 
@@ -536,6 +543,13 @@ pub mod check {
 These replace each app's "the catalog parses, every key resolves" tests and
 mafia's sv-SE parity test. livemix's vocabulary rules stay in livemix, built
 on `ids` and a `Phrases`.
+
+An app that translates a library's messages in its own catalog (the
+`watchword-*` ids in an app's `sv-SE.ftl`, section 2.11) checks parity with
+`check::parity_with(&APP, SV_SE, &[&auth::yew023::L10N])`: those ids
+pass because the library defines them, while a misspelled one, defined
+neither in the app's default language nor in any given library, is still
+reported. Library ids are never required in the app.
 
 ### 2.10 Yew (`yew023`)
 
@@ -626,7 +640,7 @@ watchword-yew023 has about a hundred English strings inline (`"Sign in"`,
 An app adds the catalog after its own, `.catalog(&APP).catalog(&auth::yew023::L10N)`,
 and translates watchword into Swedish by adding `watchword-*` messages to its
 own `sv-SE.ftl` (the app's catalog wins a duplicate id) until watchword ships
-`sv-SE` itself. Without any provider, or with a provider that never added the
+`sv-SE` itself, checking them with `check::parity_with`. Without any provider, or with a provider that never added the
 catalog, watchword renders its built-in English, as it does today. That change
 is watchword's, on watchword's board.
 

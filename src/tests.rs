@@ -571,6 +571,71 @@ fn check_parity_and_ids() {
     assert!(check::parity(&LIB, Lang::new("fr")).is_err());
 }
 
+#[test]
+fn check_parity_with_libraries() {
+    // The app translates one of the library's messages, misspells another,
+    // and has a stray id of its own.
+    static TRANSLATING: Catalog = Catalog::new(
+        "app",
+        &[
+            Source::new(Lang::EN_US, "a = A\nb = B\n"),
+            Source::new(
+                SV_SE,
+                "a = A\nlib-sign-in = Logga in\nlib-sign-up = Registrera\nc = C\n",
+            ),
+        ],
+    );
+
+    // Without libraries, parity reports every id English lacks, and
+    // parity_with with none says the same.
+    let problems = check::parity(&TRANSLATING, SV_SE).unwrap_err();
+    assert_eq!(
+        problems.to_string(),
+        "\
+app sv-SE: `b` is missing (defined in en-US)
+app sv-SE: `lib-sign-in` is not defined in en-US
+app sv-SE: `lib-sign-up` is not defined in en-US
+app sv-SE: `c` is not defined in en-US"
+    );
+    assert_eq!(
+        check::parity_with(&TRANSLATING, SV_SE, &[]).unwrap_err(),
+        problems
+    );
+
+    // With the library, its id is accepted; an unknown id under its prefix
+    // and the stray id are still reported, and the library's other ids are
+    // not required.
+    let problems = check::parity_with(&TRANSLATING, SV_SE, &[&LIB]).unwrap_err();
+    assert_eq!(
+        problems.to_string(),
+        "\
+app sv-SE: `b` is missing (defined in en-US)
+app sv-SE: `lib-sign-up` is defined neither in en-US nor in any given library
+app sv-SE: `c` is defined neither in en-US nor in any given library"
+    );
+
+    // Only a library's default language counts: an id the library defines
+    // in Swedish alone is not accepted.
+    static PARTIAL: Catalog = Catalog::new(
+        "lib",
+        &[
+            Source::new(Lang::EN_US, "lib-sign-in = Sign in\n"),
+            Source::new(SV_SE, "lib-sign-in = Logga in\nlib-sign-up = Registrera\n"),
+        ],
+    )
+    .with_prefix("lib-");
+
+    let problems = check::parity_with(&TRANSLATING, SV_SE, &[&PARTIAL]).unwrap_err();
+    assert_eq!(
+        problems,
+        check::parity_with(&TRANSLATING, SV_SE, &[&LIB]).unwrap_err()
+    );
+
+    // Missing ids are reported as before.
+    let problems = check::parity_with(&APP, SV_SE, &[&LIB]).unwrap_err();
+    assert_eq!(problems, check::parity(&APP, SV_SE).unwrap_err());
+}
+
 #[cfg(feature = "koine01")]
 #[test]
 fn koine01_warns_about_unknown_languages() {

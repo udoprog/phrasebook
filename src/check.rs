@@ -154,7 +154,42 @@ fn check_source(catalog: &Catalog, source: &Source, report: &mut dyn FnMut(Strin
 /// `lang` defines exactly the message ids of the catalog's default
 /// language (its first source). Terms are a translation's own business and
 /// are not compared.
+///
+/// An app that translates a library's messages in its own catalog checks
+/// it with [`parity_with`] instead.
 pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems> {
+    parity_with(catalog, lang, &[])
+}
+
+/// As [`parity`], for a catalog that also translates the messages of
+/// `libraries`: an id in `lang` that the catalog's default language lacks
+/// is accepted when one of `libraries` defines it in that library's default
+/// language. Library ids are never required in the catalog.
+///
+/// ```
+/// use phrasebook::{Catalog, Lang, Source, check};
+///
+/// const SV_SE: Lang = Lang::new("sv-SE");
+///
+/// static LIB: Catalog = Catalog::new("lib", &[
+///     Source::new(Lang::EN_US, "lib-sign-in = Sign in\nlib-sign-out = Sign out\n"),
+/// ])
+/// .with_prefix("lib-");
+///
+/// static APP: Catalog = Catalog::new("app", &[
+///     Source::new(Lang::EN_US, "title = Mafia\n"),
+///     Source::new(SV_SE, "title = Maffia\nlib-sign-in = Logga in\nlib-sing-out = Logga ut\n"),
+/// ]);
+///
+/// assert!(check::parity(&APP, SV_SE).is_err());
+///
+/// let problems = check::parity_with(&APP, SV_SE, &[&LIB]).unwrap_err();
+/// assert_eq!(
+///     problems.to_string(),
+///     "app sv-SE: `lib-sing-out` is defined neither in en-US nor in any given library"
+/// );
+/// ```
+pub fn parity_with(catalog: &Catalog, lang: Lang, libraries: &[&Catalog]) -> Result<(), Problems> {
     let mut problems = Problems::default();
 
     let Some(default) = catalog.default_lang() else {
@@ -173,6 +208,12 @@ pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems> {
     let expected_set = expected.iter().collect::<HashSet<_>>();
     let actual_set = actual.iter().collect::<HashSet<_>>();
 
+    let library_ids = libraries
+        .iter()
+        .filter_map(|library| Some(ids(library, library.default_lang()?)))
+        .flatten()
+        .collect::<HashSet<_>>();
+
     for id in &expected {
         if !actual_set.contains(id) {
             problems.push(
@@ -184,9 +225,17 @@ pub fn parity(catalog: &Catalog, lang: Lang) -> Result<(), Problems> {
     }
 
     for id in &actual {
-        if !expected_set.contains(id) {
-            problems.push(catalog, lang, format!("`{id}` is not defined in {default}"));
+        if expected_set.contains(id) || library_ids.contains(id) {
+            continue;
         }
+
+        let message = if libraries.is_empty() {
+            format!("`{id}` is not defined in {default}")
+        } else {
+            format!("`{id}` is defined neither in {default} nor in any given library")
+        };
+
+        problems.push(catalog, lang, message);
     }
 
     problems.into_result()

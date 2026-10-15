@@ -81,7 +81,9 @@ assert_eq!(phrases.msg("players", &args!(count = "4")), "4 players");
 
 In an app's tests, [`check`] turns a catalog's problems (syntax errors,
 duplicate ids, ids outside the prefix, messages that do not format, and
-untranslated or extra messages) into failures.
+untranslated or extra messages) into failures; an app that translates a
+library's messages in its own catalog checks parity with
+`check::parity_with`, naming the library catalogs.
 
 <br>
 

@@ -19,9 +19,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(phrasebook_docsrs)'] }
 all-features = true
 rustdoc-args = ["--cfg", "phrasebook_docsrs"]
 
-# No feature is on by default. fluent and unic-langid are pre-1.0 and stay out
-# of the public API, so upgrading them is an internal change. A dependency that
-# is not yet 1.0 and appears in the API is named after its version (`yew023`).
 [features]
 default = []
 browser = ["dep:web-sys"]
@@ -33,18 +30,14 @@ fluent-bundle = "0.16.0"
 fluent-syntax = "0.12.0"
 unic-langid = "0.9.6"
 tracing = "0.1.44"
-# yew in the API (trait impls on `Phrases` and `Lang`), named after its
-# version. The library uses none of yew's macros, which expand to `::yew::`.
 yew023 = { package = "yew", version = "0.23.0", optional = true }
 koine01 = { package = "koine", version = "0.1.0", path = "../koine", default-features = false, features = ["locale"], optional = true }
 
-# browser: only used on wasm32; elsewhere its functions return nothing.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3.77", features = ["Window", "Navigator", "Storage"], optional = true }
 
-# Tests render components to a string with `ssr`. They and the doc examples
-# use yew's macros through `extern crate yew023 as yew;`, since cargo allows
-# one key per crate.
+# Cargo allows one key per crate, so tests use `extern crate yew023 as yew;`
+# for yew's macros.
 [dev-dependencies]
 yew023 = { package = "yew", version = "0.23.0", features = ["ssr"] }
 futures = { version = "0.3", default-features = false, features = ["executor"] }

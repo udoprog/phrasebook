@@ -4,10 +4,11 @@ phrasebook is the Fluent localization layer of a Rust web frontend: one
 Fluent bundle per supported language, built from `.ftl` resources compiled
 into the binary; message lookup with arguments and plurals; a fallback
 language and visible missing-message behaviour; the user's chosen language
-remembered in the browser; and a Yew context, provider and hooks (behind a
-versioned `yew023` feature) through which any component looks messages up,
-including components of a library such as watchword, which ship their own
-messages and fall back to built-in English when the app provides nothing.
+remembered in the browser; and a handle, `Phrases`, that is itself the Yew
+context type (with yew glue behind a versioned `yew023` feature), through
+which any component looks messages up, including components of a library such
+as watchword, which ship their own messages and fall back to built-in English
+when the app provides nothing.
 
 It replaces three hand-rolled `l10n.rs` modules:
 
@@ -167,41 +168,42 @@ identifier that apps convert to and from.
 
 ### 2.1 Crates and features
 
-One crate, **phrasebook** (decided by the user, question 3): the language
-identifier, catalogs, the dictionary, the `L10n` handle, arguments, the
-browser helpers, and, behind the `yew023` feature, the `phrasebook::yew023`
-module with the provider component, hooks and struct-component helpers for
-yew 0.23.
+One crate, **phrasebook** (decided by the user, questions 3 and 5): the
+language identifier, catalogs, the dictionary, the `Phrases` handle,
+arguments, the browser helpers, and, behind the `yew023` feature, the
+`phrasebook::yew023` module for yew 0.23.
 
-yew's macros (`html!`, `#[function_component]`, `#[derive(Properties)]`,
-`#[hook]`) expand to `::yew::` paths, which would force yew to be a direct
-dependency under the key `yew`; watchword splits watchword-yew023 out for
-that reason. phrasebook instead depends on yew under the versioned key
-`yew023` (`yew023 = { package = "yew", version = "0.23", optional = true }`)
-and uses none of yew's macros: `L10nProvider` is a hand-written `Component`
-with a hand-written `Properties` impl (and its builder), the hooks are built
-on `yew::functional::Hook`/`use_context` without `#[hook]`, and markup is
-built with `yew::virtual_dom` (`VNode`, `VList`) and `ContextProvider` rather
-than `html!`. Signatures in 2.10 are written with the macros for brevity; the
-implementation spells them out. A later yew is another module and feature
-beside it (`yew024`).
+phrasebook ships no components and no hooks. The context type is the handle
+itself, so an app provides it with yew's own `ContextProvider<Phrases>` and a
+component reads it with yew's own `use_context::<Phrases>()`, or
+`ctx.link().context::<Phrases>(callback)` in a struct component. What
+`yew023` adds is trait impls on `Phrases` (and `Lang`) and two plain
+functions for when no handle is provided (2.10).
+
+None of that needs yew's macros (`html!`, `#[function_component]`,
+`#[derive(Properties)]`, `#[hook]`), which expand to `::yew::` paths and
+would force yew to be a direct dependency under the key `yew`; watchword
+splits watchword-yew023 out for that reason. phrasebook depends on yew under
+the versioned key `yew023` (`yew023 = { package = "yew", version = "0.23",
+optional = true }`) and so stays one crate. A later yew is another module and
+feature beside it (`yew024`).
 
 No feature is on by default.
 
 | Feature | Enables | Pulls in |
 |---|---|---|
-| *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `L10n`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
-| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences | web-sys, wasm-bindgen |
+| *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
+| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store` | web-sys, wasm-bindgen |
 | `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's language and country records | koine 0.1 (`language`, `country`, `locale` features) |
-| `yew023` | `phrasebook::yew023`, implies `browser` | yew 0.23 (as `yew023`) |
+| `yew023` | `phrasebook::yew023`: trait impls on `Phrases` and `Lang`, the no-provider helpers | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
 that appears in the public API is named after its version. fluent (0.17,
 fluent-bundle 0.16) and unic-langid (0.9) are not 1.0 and are kept out of the
 API entirely: `Args`, `Value` and `Lang` are phrasebook's own types, so a
 fluent upgrade is an internal change rather than a `fluent017` feature. yew is
-in the API (the hooks), hence `yew023`. koine is not 1.0 and its records appear
-in the API, hence `koine01` (see 2.8). web-sys appears nowhere in the API, so
+in the API (its traits, implemented on `Phrases`), hence `yew023`. koine is
+not 1.0 and its records appear in the API, hence `koine01` (see 2.8). web-sys appears nowhere in the API, so
 `browser` is unversioned. tracing is an internal dependency.
 
 ### 2.2 `Lang`: a language identifier
@@ -273,7 +275,7 @@ pub static L10N: Catalog = Catalog::new("watchword", &[
 ```
 
 The first source is the catalog's own default language, which is what it
-falls back to when used without a provider (2.7). Sources stay `&'static str`
+falls back to when used without a provider (2.10). Sources stay `&'static str`
 and are parsed only when a bundle for that language is first needed.
 
 ### 2.4 `Phrasebook`: the dictionary
@@ -285,7 +287,7 @@ pub struct Phrasebook { /* Rc<Inner> */ }
 impl Phrasebook {
     pub fn builder() -> Builder;
     /// A handle in `lang`, or in the fallback if `lang` is not declared.
-    pub fn l10n(&self, lang: Lang) -> L10n;
+    pub fn phrases(&self, lang: Lang) -> Phrases;
     pub fn languages(&self) -> &[Language];
     pub fn fallback(&self) -> Lang;
     /// The best declared language for a list of preferred tags, most
@@ -320,17 +322,34 @@ five languages parses one at start-up. A duplicate id across catalogs, an id
 outside its catalog's prefix, and a syntax error are logged with `tracing`
 when the bundle is built; `check` (2.9) turns them into test failures.
 
-### 2.5 `L10n`: the handle components use
+### 2.5 `Phrases`: the handle components use
+
+`Phrasebook` is the shared set of every language's bundles; `Phrases` is the
+phrasebook open at the current language, and is what components get from
+context: `use_context::<Phrases>()`, then `phrases.text(...)` and
+`phrases.msg(...)`.
 
 ```rust
 #[derive(Clone)]
-pub struct L10n { /* Phrasebook, Lang, Option<switch> */ }
-// PartialEq: same Phrasebook (pointer) and same language.
+pub struct Phrases { /* Phrasebook, Lang, Option<&'static Catalog> backstop */ }
+// PartialEq: same Phrasebook (pointer), same language, same backstop.
 
-impl L10n {
+impl Phrases {
+    /// A shared, per-thread handle with no catalogs: every lookup renders
+    /// the id.
+    pub fn empty() -> Phrases;
+    /// A catalog alone, in its own default language, built once per thread
+    /// per catalog; what a library renders when nothing is provided.
+    pub fn from_catalog(catalog: &'static Catalog) -> Phrases;
+    /// The same handle, with `catalog` consulted after every bundle in the
+    /// chain lacks a message (see Lookup).
+    pub fn with_backstop(&self, catalog: &'static Catalog) -> Phrases;
+
     pub fn lang(&self) -> Lang;
     pub fn languages(&self) -> &[Language];
-    pub fn with_lang(&self, lang: Lang) -> L10n;
+    /// The same bundles in another language; an app's root calls this on a
+    /// language change and provides the result.
+    pub fn with_lang(&self, lang: Lang) -> Phrases;
 
     /// A message without arguments, resolved once per language and id and
     /// handed out as an `Rc` clone after that. Converts into yew's
@@ -342,28 +361,22 @@ impl L10n {
     /// the chain defines it.
     pub fn try_text(&self, id: &str) -> Option<Rc<str>>;
     pub fn try_msg(&self, id: &str, args: &Args<'_>) -> Option<String>;
-
-    /// Ask whoever provides this handle to switch language and remember the
-    /// choice (2.6, 2.7). Without a provider: a warning, and nothing happens.
-    pub fn set_lang(&self, lang: Lang);
-    /// Switch without remembering, as a projector page cycling through
-    /// languages does.
-    pub fn show_lang(&self, lang: Lang);
-    /// Attach what `set_lang`/`show_lang` call; used by providers.
-    pub fn on_switch(self, switch: impl Fn(Lang, Remember) + 'static) -> L10n;
 }
-
-/// Whether a switch is remembered (`set_lang`) or only shown (`show_lang`).
-pub enum Remember { Yes, No }
 ```
 
-`text` and `msg` keep the names livemix and mafia use, so their call sites and
-livemix's `sweep` (which greps for `l10n.text("` and `l10n.msg("`) carry over
-unchanged; army's `get` and `args` are renamed (section 3).
+The handle carries no way to switch language. Switching is the app's state:
+its root calls `with_lang` (and `store`, 2.7) and provides the new handle. A
+deep component that changes the language (a picker) gets a callback from the
+app, as it would for any other app state.
+
+`text` and `msg` keep the names livemix and mafia use, so their call sites
+carry over with at most a variable rename (`l10n` to `phrases`); army's `get`
+and `args` are renamed (section 3).
 
 **Lookup.** A message is formatted in the first of these that defines it:
-the handle's language; the fallback language; the backstop catalog of a
-library hook (2.7); and otherwise the result is the id itself, so the hole is
+the handle's language; the fallback language; the handle's backstop catalog,
+if it has one (`with_backstop`, used by `or_catalog` in 2.10); and otherwise
+the result is the id itself, so the hole is
 visible on the page rather than blank. Each miss (the handle's language
 lacking a message, or every bundle lacking it) is logged once per id and
 language with `tracing::warn!`, and format errors (a missing argument, say)
@@ -409,7 +422,6 @@ pub mod browser {
     pub const DEFAULT_KEY: &str = "lang";
     /// The remembered choice, if it parses and is declared.
     pub fn remembered(book: &Phrasebook, key: &str) -> Option<Lang>;
-    pub fn remember(lang: Lang, key: &str);
     /// `navigator.languages`, most preferred first.
     pub fn preferred() -> Vec<String>;
     /// The language to start in: the remembered choice, else the browser's
@@ -417,7 +429,20 @@ pub mod browser {
     /// fallback.
     pub fn initial(book: &Phrasebook, key: &str) -> Lang;
 }
+
+impl Phrases {
+    /// Remember the handle's language under `browser::DEFAULT_KEY`.
+    pub fn store(&self);
+    /// The same, under another key.
+    pub fn store_as(&self, key: &str);
+}
 ```
+
+An app's root calls `browser::initial` once to choose its starting language,
+`book.phrases(browser::initial(&book, browser::DEFAULT_KEY))`, and on a
+language the user picked, `phrases.with_lang(lang)` followed by `store()` on
+the new handle. A change the user did not choose (a projector page cycling
+through languages) calls `with_lang` alone.
 
 The key and value format (`"lang"`, `"en-US"`) are the apps' current ones, so
 users keep their choice across the switch. Detection reads the whole
@@ -471,63 +496,73 @@ pub mod check {
 
 These replace each app's "the catalog parses, every key resolves" tests and
 mafia's sv-SE parity test. livemix's vocabulary rules stay in livemix, built
-on `ids` and an `L10n`.
+on `ids` and a `Phrases`.
 
 ### 2.10 Yew (`yew023`)
 
-The context type is `L10n` itself, so a component looks messages up the same
-way whatever provides it.
+phrasebook ships no components and no hooks. The context type is `Phrases`
+itself, so an app provides it with yew's own `ContextProvider<Phrases>` (army
+already does this with its `L10n`) and components read it with yew's own
+`use_context::<Phrases>()`, or `ctx.link().context::<Phrases>(callback)` in a
+struct component. The feature adds only this:
 
 ```rust
 pub mod yew023 {
-    /// Owns the current language: starts in `browser::initial`, and gives
-    /// its children an `L10n` whose `set_lang` switches and remembers and
-    /// whose `show_lang` switches only.
-    #[function_component]
-    pub fn L10nProvider(props: &L10nProviderProps) -> Html;
+    // So the handle and language pass as props and context like yew's own
+    // cheap values.
+    impl ImplicitClone for Phrases {}
+    impl ImplicitClone for Lang {}
+    // `IntoPropValue` impls where a call site shows the need (`Lang` into
+    // `AttrValue` for a `lang` attribute, say). `text`'s `Rc<str>` already
+    // converts into `AttrValue` and into children.
 
-    #[derive(Properties, PartialEq)]
-    pub struct L10nProviderProps {
-        pub phrasebook: Phrasebook,
-        #[prop_or(AttrValue::Static(browser::DEFAULT_KEY))]
-        pub storage_key: AttrValue,
-        /// Told about every switch, for an app that also keeps the language
-        /// (to update the tab title, say).
-        #[prop_or_default]
-        pub onchange: Callback<Lang>,
-        pub children: Html,
-    }
+    /// The provided handle, or `Phrases::empty()` (renders ids) with one
+    /// warning per thread.
+    pub fn or_default(phrases: Option<Phrases>) -> Phrases;
 
-    /// The provided `L10n`. Without a provider: a shared empty one that
-    /// renders ids, built once per thread, and one warning.
-    #[hook]
-    pub fn use_l10n() -> L10n;
-
-    /// For a library component: the provided `L10n` backed by the library's
-    /// catalog, so a message the app's bundles lack (the app did not add the
-    /// catalog, or not in this language) comes from the library's default
-    /// language. Without a provider: the library's catalog alone, in its
-    /// default language, built once per thread.
-    #[hook]
-    pub fn use_l10n_or(catalog: &'static Catalog) -> L10n;
-
-    /// For struct components: the `L10n` and the subscription handle to keep,
-    /// `None` on the fallback path. `callback` receives later changes.
-    pub fn context<C: Component>(link: &Scope<C>, callback: Callback<L10n>)
-        -> (L10n, Option<ContextHandle<L10n>>);
-    pub fn context_or<C: Component>(link: &Scope<C>, callback: Callback<L10n>, catalog: &'static Catalog)
-        -> (L10n, Option<ContextHandle<L10n>>);
+    /// For a library: the provided handle with the library's catalog as its
+    /// backstop (`with_backstop`), so a message the app's bundles lack (the
+    /// app did not add the catalog, or not in this language) comes from the
+    /// library's default language; or, with no handle provided,
+    /// `Phrases::from_catalog(catalog)`, the library's catalog alone in its
+    /// default language.
+    pub fn or_catalog(phrases: Option<Phrases>, catalog: &'static Catalog) -> Phrases;
 }
 ```
 
-An app that keeps the language in its own root component (mafia, livemix)
-need not use `L10nProvider`: it builds `phrasebook.l10n(lang).on_switch(...)`
-itself and renders yew's `ContextProvider<L10n>`, and every hook above works
-the same, because the context type is the same.
+Both are plain functions over the `Option<Phrases>` that `use_context`
+returns, wrapping the core constructors in 2.5:
+
+```rust
+// A function component.
+let phrases = or_default(use_context::<Phrases>());
+// A library's function component.
+let phrases = or_catalog(use_context::<Phrases>(), &L10N);
+
+// A struct component, in `create`: map the context to its first element and
+// keep the `ContextHandle` to stay subscribed; `Msg::Phrases(Phrases)`
+// receives later handles.
+let context = ctx.link().context::<Phrases>(ctx.link().callback(Msg::Phrases));
+let phrases = or_default(context.as_ref().map(|(phrases, _)| phrases.clone()));
+let handle = context.map(|(_, handle)| handle); // stored in the component
+```
+
+The app's root owns the handle, as with any other app state:
+
+```rust
+// create
+let book = l10n::phrasebook();
+let phrases = book.phrases(browser::initial(&book, browser::DEFAULT_KEY));
+// update, on a language the user picked
+self.phrases = self.phrases.with_lang(lang);
+self.phrases.store();
+// view
+html! { <ContextProvider<Phrases> context={self.phrases.clone()}> ... </ContextProvider<Phrases>> }
+```
 
 phrasebook ships no language picker: the apps' pickers differ in looks (flags,
-a context menu, a toolbar select) and need only `l10n.languages()`,
-`l10n.lang()` and `l10n.set_lang()`.
+a context menu, a toolbar select) and need only `phrases.languages()`,
+`phrases.lang()` and a `Callback<Lang>` from the app.
 
 ### 2.11 Library components (watchword)
 
@@ -539,8 +574,9 @@ watchword-yew023 has about a hundred English strings inline (`"Sign in"`,
    the `watchword-` prefix (`watchword-sign-in`, `watchword-delete = Delete {
    $name }`), and exports `pub static L10N: phrasebook::Catalog` from
    `watchword::yew023`;
-2. calls `use_l10n_or(&L10N)` (or `context_or`) in each component and looks
-   its strings up by id;
+2. calls `or_catalog(use_context::<Phrases>(), &L10N)` in each function
+   component (in a struct component, the same over `ctx.link().context`
+   mapped to its first element) and looks its strings up by id;
 3. keeps the props as overrides, defaulting to its own messages, so an app
    passing them today is unaffected;
 4. tests its catalog with `check::catalog(&L10N)`, which also enforces the
@@ -557,16 +593,19 @@ is watchword's, on watchword's board.
 
 Each migration is its app's own card on its own board, after phrasebook is
 published (or path-depended on locally). The same steps apply to all three:
-add `phrasebook = { version = "0.1", features = ["yew023"] }`, remove
-`fluent`, `unic-langid` and `fluent-syntax`, turn `l10n.rs` into a catalog and
-a phrasebook constructor, and keep the `.ftl` files where they are.
+add `phrasebook = { version = "0.1", features = ["yew023", "browser"] }`,
+remove `fluent`, `unic-langid` and `fluent-syntax`, turn `l10n.rs` into a
+catalog and a phrasebook constructor, and keep the `.ftl` files where they
+are. The new code below names the handle variable `phrases`; an app may keep
+calling it `l10n` at its existing call sites, which is only a matter of
+naming.
 
 ### 3.1 army
 
 ```rust
 // crates/web/src/l10n.rs, whole file
 use phrasebook::{Catalog, Lang, Phrasebook, Source};
-pub(crate) use phrasebook::{L10n, args};
+pub(crate) use phrasebook::{Phrases, args};
 
 static L10N: Catalog = Catalog::new("army", &[
     Source::new(Lang::EN_US, include_str!("../locales/en-US.ftl")),
@@ -581,15 +620,20 @@ pub(crate) fn phrasebook() -> Phrasebook {
 }
 ```
 
-- `main` renders `<L10nProvider phrasebook={l10n::phrasebook()}><Root /></L10nProvider>`;
-  `Root` uses `use_l10n()` instead of its own `use_memo(L10n::new)`, and `App`
-  takes the provided handle instead of building a second `L10n` and its own
+- `Root` builds the handle once, replacing its own `use_memo(L10n::new)`:
+  `use_memo((), |_| { let book = l10n::phrasebook();
+  book.phrases(browser::initial(&book, browser::DEFAULT_KEY)) })` (a
+  `use_state` instead once army has a language to switch to), passes its
+  messages to watchword's `AuthProvider`, and renders
+  `ContextProvider<Phrases>` around it. `App` reads the provided handle with
+  `use_context::<Phrases>()` instead of building a second `L10n` and its own
   `ContextProvider<L10n>`.
-- `l10n.get(` becomes `l10n.text(` (230 sites) and `l10n.args(key, [...])`
-  becomes `l10n.msg(key, &args([...]))` (74 sites), mixed-type ones
+- `l10n.get(` becomes `phrases.text(` (230 sites) and `l10n.args(key, [...])`
+  becomes `phrases.msg(key, &args([...]))` (74 sites), mixed-type ones
   `&args!(pts = number(points), limit = limit)`, which also stops
   stringifying counts.
-- `armies::l10n(ctx)` becomes `phrasebook::yew023::context(ctx.link(), ...)`.
+- `armies::l10n(ctx)` becomes `phrasebook::yew023::or_default` over
+  `ctx.link().context::<Phrases>(..)` mapped to its first element (2.10).
 - `signed_out_notice` can go once watchword's own message says the same.
 - **Deletes**: the `L10n` type, `format`, `bundle` and the tests in `l10n.rs`
   (about 105 of its 121 lines), the re-parse-per-call fallback, and three
@@ -606,7 +650,7 @@ content. The frontend maps between it and `Lang`:
 ```rust
 // crates/frontend/src/l10n.rs
 pub(crate) use api::Locale;
-pub(crate) use phrasebook::{L10n, args};
+pub(crate) use phrasebook::{Phrases, args};
 use phrasebook::{Catalog, Lang, Phrasebook, Source};
 
 const SV_SE: Lang = Lang::new("sv-SE");
@@ -627,23 +671,26 @@ pub(crate) fn phrasebook() -> Phrasebook {
 pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(locale.code()).expect("a shipped locale") }
 pub(crate) fn locale(lang: Lang) -> Locale { Locale::from_code(&lang.to_string()).unwrap_or(Locale::DEFAULT) }
 
-/// `l10n.locale()` for the components picking server-side translations.
+/// `phrases.locale()` for the components picking server-side translations.
 pub(crate) trait LocaleExt { fn locale(&self) -> Locale; }
-impl LocaleExt for L10n { fn locale(&self) -> Locale { locale(self.lang()) } }
+impl LocaleExt for Phrases { fn locale(&self) -> Locale { locale(self.lang()) } }
 ```
 
-- `App` keeps owning the language, since it needs it above the provider for
+- `App` keeps owning the handle, since it needs it above the provider for
   the tab title: `L10n::new(l10n::load())` becomes
-  `phrasebook().l10n(browser::initial(&book, DEFAULT_KEY)).on_switch(link callback)`;
-  `Msg::SetLang` keeps `with_lang`, and `l10n::store` becomes
-  `browser::remember`; `Msg::CycleLang` keeps `with_lang` without
-  remembering. It still renders `ContextProvider<L10n>`. The toolbar's
-  `lang`/`onsetlang` props can stay as they are or switch to
-  `l10n.set_lang`.
+  `book.phrases(browser::initial(&book, browser::DEFAULT_KEY))` with
+  `book = l10n::phrasebook()`; `Msg::SetLang` does
+  `self.phrases = self.phrases.with_lang(lang); self.phrases.store();`
+  (replacing `l10n::store`); `Msg::CycleLang` does `with_lang` without
+  storing. It renders `ContextProvider<Phrases>`. The toolbar's
+  `lang`/`onsetlang` props stay as they are: the picker's callback comes
+  from `App`.
 - The ~25 `strings.get(api::Field::..., l10n.lang())` become
-  `l10n.locale()` (a rename at those sites, with `LocaleExt` in scope).
-- The `.expect("Expected l10n context")` sites become `use_l10n()` and
-  `phrasebook::yew023::context(..)`, which do not panic.
+  `phrases.locale()` (a rename at those sites, with `LocaleExt` in scope).
+- The `.expect("Expected l10n context")` sites become
+  `or_default(use_context::<Phrases>())` and, in struct components,
+  `or_default` over `ctx.link().context` mapped to its first element (2.10),
+  which do not panic.
 - **Deletes**: `langid`, `detect`, `load`, `store`, `STORAGE_KEY`, `Inner`,
   `bundle`, `format_in`, the `L10n` type and `args` (about 180 of 261 lines;
   what stays is the catalog and the mapping above), the hand-matched
@@ -661,7 +708,7 @@ drives both the picker and the builder.
 ```rust
 // crates/web/src/l10n.rs
 pub(crate) use api::Locale;
-pub(crate) use phrasebook::{Args, L10n, Value, args};
+pub(crate) use phrasebook::{Args, Phrases, Value, args};
 
 static L10N: Catalog = Catalog::new("livemix", &[
     Source::new(Lang::EN_US, include_str!("../locales/en-US.ftl")),
@@ -671,19 +718,26 @@ pub(crate) fn phrasebook() -> Phrasebook { /* as mafia, from Locale::ALL */ }
 pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect("a shipped locale") }
 ```
 
-- `App`'s `L10n::new(crate::l10n::load())` and `Msg::SetLang` change as in
-  mafia; `LanguageSelector` maps the chosen `Locale` with `lang()`.
-- `ctx.rs`'s `impl ContextFallback for L10n` stays (a local trait on a foreign
-  type is allowed), with `fallback()` returning `phrasebook().l10n(Lang::EN_US)`;
-  its `use_ctx::<L10n>()` and `link_ctx` sites do not change. Alternatively livemix
-  drops that impl and uses `phrasebook::yew023::use_l10n`, which does the
-  same.
+- `App` keeps owning the handle: its `L10n::new(crate::l10n::load())` and
+  `Msg::SetLang` change as in mafia; `LanguageSelector` keeps emitting
+  `Msg::SetLang` through its callback and maps the chosen `Locale` with
+  `lang()`.
+- `ctx.rs`'s `impl ContextFallback for L10n` becomes `impl ContextFallback
+  for Phrases` (a local trait on a foreign type is allowed), with
+  `fallback()` returning `phrasebook().phrases(Lang::EN_US)`; its
+  `use_ctx::<L10n>()` sites name `Phrases` instead, and the `link_ctx` sites
+  do not change. Alternatively livemix drops that impl and uses
+  `or_default(use_context::<Phrases>())`, whose fallback renders ids rather
+  than English.
 - `text` returns `Rc<str>` instead of `AttrValue`: props and children accept
   it unchanged; the few places that name `AttrValue` as the binding's type
   add `.into()`.
 - `FluentArgs`/`FluentValue` in signatures become `Args`/`Value`;
   `FluentValue::from(count)` becomes `Value::from(count)` or plain `count`.
-- `sweep` is unchanged: the call names are the same.
+- `sweep` finds asks by grepping for `l10n.text("` and `l10n.msg("`: the
+  method names are the same, so it keeps matching if livemix keeps naming
+  the variable `l10n`, and its two patterns become `phrases.text("` and
+  `phrases.msg("` if the call sites rename it.
 - **Deletes**: `args`, `langid`, `detect`, `load`, `store`, `STORAGE_KEY`,
   `Inner`, `bundle`, `format_in`, `selectors`, `expression_selectors`,
   `numbered`, the `L10n` type and its cache (lines 1 to 260), and `fluent`,
@@ -692,19 +746,20 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
   unselected-digits, placeable and detection tests move into phrasebook's own
   suite, where they cover every app. Kept in livemix: the vocabulary tests,
   `every_key_the_wire_contract_names_resolves`, the clock vocabulary, the
-  `-detail` rule and the flag test, all rewritten onto `phrasebook().l10n(..)`.
+  `-detail` rule and the flag test, all rewritten onto
+  `phrasebook().phrases(..)`.
 - **Gains**: a second language is a `Locale` constant in `ALL` and a `.ftl`;
   missing messages are logged.
 
 ## 4. Decisions
 
 1. **One dictionary, many cheap handles.** The bundles live behind one `Rc`
-   in `Phrasebook`; an `L10n` is that `Rc` plus a `Lang`, compared by pointer
+   in `Phrasebook`; a `Phrases` is that `Rc` plus a `Lang`, compared by pointer
    and language, as in all three apps. Switching language is `with_lang`, so
    a re-render happens exactly when the language changes.
 2. **phrasebook's own `Lang`, apps keep their `Locale`.** Each app's locale
    type carries app concerns (mafia's database column and wire format,
-   livemix's flags). A generic `L10n<L>` would let apps use theirs directly,
+   livemix's flags). A generic `Phrases<L>` would let apps use theirs directly,
    but a library component cannot name the app's type, so the context type
    has to be concrete. Apps convert with a one-line function each way.
 3. **Fluent stays out of the API.** fluent and unic-langid are pre-1.0;
@@ -714,11 +769,13 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    collisions are mistakes, except where an app deliberately overrides or
    translates a library message, which is why the app's catalog goes first
    and wins. A duplicate is logged at build and fails `check::catalog`.
-5. **The context type is `L10n`, and providing it is open.** `L10nProvider`
-   covers an app with no reason to own the language (army); an app that does
-   own it (mafia's title, livemix's `App` state) provides `L10n` itself. The
-   switch callback rides inside `L10n` so a deep component (a picker) can ask
-   for a change without a second context.
+5. **The context type is `Phrases`, provided and read with yew's own
+   tools.** Every app's root owns the handle as app state and renders
+   `ContextProvider<Phrases>`; components read it with `use_context`. A
+   provider component and hooks would only wrap those, and a callback inside
+   the handle would duplicate what the app already has: changing language is
+   `with_lang` (and `store`) at the root, and a deep component (a picker)
+   gets a callback from the app like for any other app state.
 6. **Bidi isolation off by default.** All three apps turn it off: in HTML
    text nodes the isolation marks show as stray characters. A right-to-left
    app can turn it on with `use_isolating(true)`.
@@ -727,7 +784,9 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    English never did.
 8. **No provider is not a panic.** A component outside a provider (a test, a
    portal, a library used without phrasebook set up) renders ids, or a
-   library's built-in English, with one warning, as livemix does.
+   library's built-in English, with one warning, as livemix does. These are
+   plain functions over what `use_context` returns, `or_default` and
+   `or_catalog` (2.10), rather than hooks.
 9. **Bundles parse lazily, per language.** livemix's en-US is 3,256 lines;
    parsing languages nobody is reading only slows start-up.
 
@@ -736,7 +795,14 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
 1. The design is approved.
 2. koine is the optional `koine01` feature; the core checks only the tag's
    shape.
-3. **One crate**, whose yew code avoids yew's macros (see 2.1), rather than a
-   second phrasebook-yew023 crate.
+3. **One crate**, rather than a second phrasebook-yew023 crate: its
+   `yew023` code needs no yew macros because it has no components (see 2.1).
 4. Digit strings passed to a selector variable are read as numbers, as
    livemix does.
+5. (2026-10-15, via the foreman) **No components or hooks.** `yew023` is
+   trait impls on `Phrases` (and `Lang`) plus the plain fallback helpers
+   `or_default` and `or_catalog`; apps provide and read the handle with
+   yew's own `ContextProvider` and `use_context` (2.10).
+6. (2026-10-15, via the foreman) The handle is named **`Phrases`**: the
+   phrasebook open at the current language. `Phrasebook::l10n` is
+   `Phrasebook::phrases`.

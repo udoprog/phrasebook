@@ -167,18 +167,24 @@ identifier that apps convert to and from.
 
 ### 2.1 Crates and features
 
-Two crates, released in lockstep and pinning each other with `=` versions, as
-watchword does:
+One crate, **phrasebook** (decided by the user, question 3): the language
+identifier, catalogs, the dictionary, the `L10n` handle, arguments, the
+browser helpers, and, behind the `yew023` feature, the `phrasebook::yew023`
+module with the provider component, hooks and struct-component helpers for
+yew 0.23.
 
-- **phrasebook**: the language identifier, catalogs, the dictionary, the
-  `L10n` handle, arguments, and the browser helpers. No yew. It re-exports
-  phrasebook-yew023 as `phrasebook::yew023` behind the `yew023` feature, so an
-  app needs only `phrasebook = { features = ["yew023"] }`.
-- **phrasebook-yew023**: the provider component, hooks and struct-component
-  helpers for yew 0.23. It depends on yew under the key `yew` because yew's
-  macros (`html!`, `#[function_component]`, `#[derive(Properties)]`,
-  `#[hook]`) expand to `::yew::` paths, the reason watchword has
-  watchword-yew023. A later yew is another crate beside it.
+yew's macros (`html!`, `#[function_component]`, `#[derive(Properties)]`,
+`#[hook]`) expand to `::yew::` paths, which would force yew to be a direct
+dependency under the key `yew`; watchword splits watchword-yew023 out for
+that reason. phrasebook instead depends on yew under the versioned key
+`yew023` (`yew023 = { package = "yew", version = "0.23", optional = true }`)
+and uses none of yew's macros: `L10nProvider` is a hand-written `Component`
+with a hand-written `Properties` impl (and its builder), the hooks are built
+on `yew::functional::Hook`/`use_context` without `#[hook]`, and markup is
+built with `yew::virtual_dom` (`VNode`, `VList`) and `ContextProvider` rather
+than `html!`. Signatures in 2.10 are written with the macros for brevity; the
+implementation spells them out. A later yew is another module and feature
+beside it (`yew024`).
 
 No feature is on by default.
 
@@ -187,7 +193,7 @@ No feature is on by default.
 | *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `L10n`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences | web-sys, wasm-bindgen |
 | `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's language and country records | koine 0.1 (`language`, `country`, `locale` features) |
-| `yew023` | `phrasebook::yew023` (phrasebook-yew023), implies `browser` | yew 0.23 |
+| `yew023` | `phrasebook::yew023`, implies `browser` | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
 that appears in the public API is named after its version. fluent (0.17,
@@ -725,17 +731,12 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
 9. **Bundles parse lazily, per language.** livemix's en-US is 3,256 lines;
    parsing languages nobody is reading only slows start-up.
 
-### Open questions for the user
+### Decisions by the user (2026-10-15, card ea9973ec)
 
-1. Approve this design so implementation (card 53f69b29) can start.
-2. koine as the optional `koine01` feature (recommended: the core only needs
-   the tag's shape, and validating against ISO 639 would link koine's large
-   language table into every app's wasm), or a required dependency with
-   `Lang` built on koine's records.
-3. Two crates, phrasebook and phrasebook-yew023 (recommended, watchword's
-   layout, forced by yew's macros), or one crate whose yew code avoids the
-   macros (hand-written `Component` and `Properties` impls).
-4. Keep livemix's reading of digit strings as numbers in selectors
-   (recommended: it makes army's and livemix's stringified counts pick the
-   right plural with no call-site change), or drop it and rely on `args!`
-   passing real numbers.
+1. The design is approved.
+2. koine is the optional `koine01` feature; the core checks only the tag's
+   shape.
+3. **One crate**, whose yew code avoids yew's macros (see 2.1), rather than a
+   second phrasebook-yew023 crate.
+4. Digit strings passed to a selector variable are read as numbers, as
+   livemix does.

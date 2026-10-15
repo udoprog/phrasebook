@@ -1,0 +1,13 @@
+[package]
+name = "phrasebook-example-app"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "The phrasebook example's Yew app, built with trunk."
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[dependencies]
+phrasebook = { path = "../..", features = ["browser", "yew023"] }
+yew = { version = "0.23.0", features = ["csr"] }

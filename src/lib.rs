@@ -110,12 +110,36 @@
 //! lacks, or to the catalog alone when nothing is provided. The [`yew023`]
 //! module documents both forms in full, struct components included.
 //!
+//! <br>
+//!
+//! ## Examples
+//!
+//! [`examples/tour.rs`] prints what an app's catalog, a library's catalog
+//! with a backstop, plurals and the fallback language produce, in English
+//! and Swedish:
+//!
+//! ```sh
+//! cargo run --example tour
+//! ```
+//!
+//! [`examples/app`] is a small Yew app: the root owns and provides the
+//! handle, a picker switches and remembers the language, and a library-style
+//! component falls back to its own catalog. It is its own cargo workspace,
+//! so it adds nothing to the crate's builds, and is built and served with
+//! [trunk]:
+//!
+//! ```sh
+//! cd examples/app && trunk serve
+//! ```
+//!
 //! [`Args`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Args.html
 //! [`args!`]: https://docs.rs/phrasebook/latest/phrasebook/macro.args.html
 //! [`browser`]: https://docs.rs/phrasebook/latest/phrasebook/browser/index.html
 //! [`Catalog`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Catalog.html
 //! [`check`]: https://docs.rs/phrasebook/latest/phrasebook/check/index.html
 //! [`docs/design.md`]: https://github.com/udoprog/phrasebook/blob/main/docs/design.md
+//! [`examples/app`]: https://github.com/udoprog/phrasebook/tree/main/examples/app
+//! [`examples/tour.rs`]: https://github.com/udoprog/phrasebook/blob/main/examples/tour.rs
 //! [`koine01`]: https://docs.rs/phrasebook/latest/phrasebook/koine01/index.html
 //! [`Lang`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Lang.html
 //! [`or_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_catalog.html
@@ -127,6 +151,7 @@
 //! [`Source`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Source.html
 //! [`Value`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Value.html
 //! [`yew023`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/index.html
+//! [trunk]: https://trunkrs.dev
 
 #![cfg_attr(phrasebook_docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]

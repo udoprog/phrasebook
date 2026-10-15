@@ -26,11 +26,14 @@
 //! |---|---|---|
 //! | *(none)* | | [`Lang`], [`Catalog`], [`Source`], [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
 //! | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, and `Phrases::store` |
+//! | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
 //!
 //! Fluent and unic-langid are used underneath but appear nowhere in the
 //! API, so upgrading them is never a breaking change. A dependency that is
 //! not yet 1.0 and does appear in the API is named after its version in its
 //! feature and module, so a later version can be added beside it.
+//!
+//! `yew023` does not enable `browser`; an app in the browser enables both.
 //!
 //! <br>
 //!
@@ -76,6 +79,36 @@
 //! duplicate ids, ids outside the prefix, messages that do not format, and
 //! untranslated or extra messages) into failures.
 //!
+//! <br>
+//!
+//! ## With yew
+//!
+//! phrasebook ships no components and no hooks: the context type is
+//! [`Phrases`] itself. The app's root owns the handle as app state and
+//! provides it with yew's own `ContextProvider<Phrases>`; on a language change
+//! it provides `phrases.with_lang(lang)` (and calls `store` on it, with
+//! `browser`). Components read it with `use_context::<Phrases>()`, or
+//! `ctx.link().context::<Phrases>(..)` in a struct component.
+//!
+//! ```rust,ignore
+//! // The app's root, in `view`.
+//! html! {
+//!     <ContextProvider<Phrases> context={self.phrases.clone()}>
+//!         <Main />
+//!     </ContextProvider<Phrases>>
+//! }
+//!
+//! // An app's component.
+//! let phrases = or_default(use_context::<Phrases>());
+//!
+//! // A library's component, with its own catalog `L10N`.
+//! let phrases = or_catalog(use_context::<Phrases>(), &L10N);
+//! ```
+//!
+//! A library's component falls back to its own catalog for messages the app
+//! lacks, or to the catalog alone when nothing is provided. The [`yew023`]
+//! module documents both forms in full, struct components included.
+//!
 //! [`Args`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Args.html
 //! [`args!`]: https://docs.rs/phrasebook/latest/phrasebook/macro.args.html
 //! [`browser`]: https://docs.rs/phrasebook/latest/phrasebook/browser/index.html
@@ -83,12 +116,15 @@
 //! [`check`]: https://docs.rs/phrasebook/latest/phrasebook/check/index.html
 //! [`docs/design.md`]: https://github.com/udoprog/phrasebook/blob/main/docs/design.md
 //! [`Lang`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Lang.html
+//! [`or_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_catalog.html
+//! [`or_default`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_default.html
 //! [`Phrasebook`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrasebook.html
 //! [`Phrases::msg`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.msg
 //! [`Phrases::text`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.text
 //! [`Phrases`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html
 //! [`Source`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Source.html
 //! [`Value`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Value.html
+//! [`yew023`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/index.html
 
 #![cfg_attr(phrasebook_docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
@@ -104,6 +140,10 @@ mod phrases;
 pub mod browser;
 
 pub mod check;
+
+#[cfg(feature = "yew023")]
+#[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "yew023")))]
+pub mod yew023;
 
 pub use self::args::{Args, Value, args};
 pub use self::catalog::{Catalog, Source};

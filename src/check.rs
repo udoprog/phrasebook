@@ -32,7 +32,8 @@
 //! ```
 //!
 //! An app's test module usually needs only [`all`], naming the library
-//! catalogs it translates, and [`Phrasebook::has_catalog`] for each of them:
+//! catalogs it translates, and [`Phrasebook::has_catalog`] for each of them,
+//! plus [`coverage`] if it collects the ids its code asks for:
 //!
 //! ```
 //! use phrasebook::{Catalog, Lang, Phrasebook, Source, check};
@@ -334,6 +335,127 @@ pub fn all_ids(catalog: &Catalog) -> Vec<String> {
     }
 
     out
+}
+
+/// The ids the code asks for against the ids the catalog defines in `lang`:
+/// an asked id that neither the catalog nor any of `libraries` defines is
+/// missing, and a catalog id that nobody asked for is unused, unless one of
+/// `libraries` defines it (the app translating or overriding a library's
+/// message).
+///
+/// Finding the ids the code asks for is the app's business, such as a scan
+/// of its sources for the ids it spells out; ids it builds at runtime are
+/// passed in as well, or checked with [`defines`].
+///
+/// ```
+/// use phrasebook::{Catalog, Lang, Source, check};
+///
+/// static LIB: Catalog = Catalog::new("lib", &[
+///     Source::new(Lang::EN_US, "lib-sign-in = Sign in\n"),
+/// ])
+/// .with_prefix("lib-");
+///
+/// static APP: Catalog = Catalog::new("app", &[
+///     Source::new(Lang::EN_US, "title = App\nold = Old\nlib-sign-in = Log in\n"),
+/// ]);
+///
+/// let asked = ["title", "subtitle", "lib-sign-in"];
+/// let problems = check::coverage(&APP, Lang::EN_US, asked, &[&LIB]).unwrap_err();
+/// assert_eq!(problems.to_string(), "\
+/// app en-US: `subtitle` is asked for but not defined
+/// app en-US: `old` is defined but never asked for");
+/// ```
+pub fn coverage<'a>(
+    catalog: &Catalog,
+    lang: Lang,
+    asked: impl IntoIterator<Item = &'a str>,
+    libraries: &[&Catalog],
+) -> Result<(), Problems> {
+    let mut problems = Problems::default();
+
+    if catalog.source(lang).is_none() {
+        problems.push(catalog, lang, "no source for this language".to_owned());
+        return problems.into_result();
+    }
+
+    let defined = ids(catalog, lang);
+    let defined_set = defined.iter().map(String::as_str).collect::<HashSet<_>>();
+    let library_ids = libraries
+        .iter()
+        .flat_map(|library| all_ids(library))
+        .collect::<HashSet<_>>();
+
+    let mut asked_set = HashSet::new();
+
+    for id in asked {
+        if !asked_set.insert(id) {
+            continue;
+        }
+
+        if !defined_set.contains(id) && !library_ids.contains(id) {
+            problems.push(
+                catalog,
+                lang,
+                format!("`{id}` is asked for but not defined"),
+            );
+        }
+    }
+
+    for id in &defined {
+        if !asked_set.contains(id.as_str()) && !library_ids.contains(id) {
+            problems.push(
+                catalog,
+                lang,
+                format!("`{id}` is defined but never asked for"),
+            );
+        }
+    }
+
+    problems.into_result()
+}
+
+/// Every id in `ids` is defined in `lang` by the catalog or one of
+/// `libraries`: the missing half of [`coverage`] alone, for ids the code
+/// builds at runtime.
+///
+/// ```
+/// use phrasebook::{Catalog, Lang, Source, check};
+///
+/// static APP: Catalog = Catalog::new("app", &[
+///     Source::new(Lang::EN_US, "role-mafia = Mafia\nrole-town = Town\n"),
+/// ]);
+///
+/// let roles = ["mafia", "town", "doctor"].map(|role| format!("role-{role}"));
+/// let problems = check::defines(&APP, Lang::EN_US, roles.iter().map(String::as_str), &[])
+///     .unwrap_err();
+/// assert_eq!(problems.to_string(), "app en-US: `role-doctor` is asked for but not defined");
+/// ```
+pub fn defines<'a>(
+    catalog: &Catalog,
+    lang: Lang,
+    ids: impl IntoIterator<Item = &'a str>,
+    libraries: &[&Catalog],
+) -> Result<(), Problems> {
+    let mut problems = Problems::default();
+    let defined = self::ids(catalog, lang);
+    let defined = defined.iter().map(String::as_str).collect::<HashSet<_>>();
+    let library_ids = libraries
+        .iter()
+        .flat_map(|library| all_ids(library))
+        .collect::<HashSet<_>>();
+    let mut seen = HashSet::new();
+
+    for id in ids {
+        if seen.insert(id) && !defined.contains(id) && !library_ids.contains(id) {
+            problems.push(
+                catalog,
+                lang,
+                format!("`{id}` is asked for but not defined"),
+            );
+        }
+    }
+
+    problems.into_result()
 }
 
 /// The message ids a catalog defines in `lang`, in file order, each once.

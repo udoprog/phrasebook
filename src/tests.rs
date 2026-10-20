@@ -664,6 +664,34 @@ app de-DE: `c` is defined neither in en-US nor in any given library"
 }
 
 #[test]
+fn check_coverage() {
+    // Asked twice, asked and missing, defined only by the library, and
+    // an app translation of a library id that nobody asks for.
+    let asked = ["hello", "hello", "nowhere", "lib-sign-in"];
+    let problems = check::coverage(&APP, SV_SE, asked, &[&LIB]).unwrap_err();
+    assert_eq!(
+        problems.to_string(),
+        "\
+app sv-SE: `nowhere` is asked for but not defined
+app sv-SE: `greeting` is defined but never asked for
+app sv-SE: `items` is defined but never asked for"
+    );
+
+    let all = check::ids(&APP, SV_SE);
+    check::coverage(&APP, SV_SE, all.iter().map(String::as_str), &[]).unwrap();
+
+    let problems = check::coverage(&APP, Lang::new("fr"), [], &[]).unwrap_err();
+    assert_eq!(problems.to_string(), "app fr: no source for this language");
+
+    check::defines(&APP, SV_SE, ["hello", "lib-sign-in"], &[&LIB]).unwrap();
+    let problems = check::defines(&APP, SV_SE, ["hello", "lib-sign-in"], &[]).unwrap_err();
+    assert_eq!(
+        problems.to_string(),
+        "app sv-SE: `lib-sign-in` is asked for but not defined"
+    );
+}
+
+#[test]
 fn has_catalog() {
     let book = Phrasebook::builder()
         .language(Lang::EN_US, "English")

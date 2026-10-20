@@ -84,7 +84,8 @@ duplicate ids, ids outside the prefix, messages that do not format, and
 untranslated or extra messages) into failures. `check::all` runs every
 check of a catalog in every language at once, naming the library catalogs
 the app translates, and `Phrasebook::has_catalog` asserts that a
-library's catalog was added.
+library's catalog was added. `check::coverage` compares the ids the code
+asks for with the ones a catalog defines, both ways.
 
 <br>
 

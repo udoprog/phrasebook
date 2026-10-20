@@ -1,7 +1,7 @@
 //! The user's language in the browser: the remembered choice in
 //! localStorage and the browser's preferences.
 //!
-//! An app's root picks its starting language once,
+//! An app's root opens its starting handle once,
 //!
 //! ```no_run
 //! use phrasebook::{Lang, Phrasebook, browser};
@@ -11,7 +11,7 @@
 //!     .language(Lang::new("sv-SE"), "Svenska")
 //!     .build();
 //!
-//! let phrases = book.phrases(browser::initial(&book, browser::DEFAULT_KEY));
+//! let phrases = browser::initial(&book);
 //! ```
 //!
 //! and when the user picks a language, provides `phrases.with_lang(lang)`
@@ -22,7 +22,7 @@
 //! Outside wasm (an app's host-side tests, say) these functions find
 //! nothing and store nothing.
 
-use crate::{Lang, Phrasebook};
+use crate::{Lang, Phrasebook, Phrases};
 
 /// The localStorage key the language is remembered under by default. The
 /// value is the canonical tag, such as `en-US`.
@@ -41,10 +41,25 @@ pub fn preferred() -> Vec<String> {
     imp::preferred()
 }
 
-/// The language to start in: the language remembered under `key`, else the
-/// browser's preferences negotiated against the phrasebook's languages
-/// ([`Phrasebook::negotiate`]), else the fallback.
-pub fn initial(book: &Phrasebook, key: &str) -> Lang {
+/// The handle to start with, open at the language remembered under
+/// [`DEFAULT_KEY`], else the browser's preferences negotiated against the
+/// phrasebook's languages ([`Phrasebook::negotiate`]), else the fallback.
+///
+/// Pairs with [`Phrases::store`](crate::Phrases::store).
+pub fn initial(book: &Phrasebook) -> Phrases {
+    initial_with_key(book, DEFAULT_KEY)
+}
+
+/// [`initial`] with the language remembered under `key`, for an app
+/// sharing its origin with another. Pairs with
+/// [`Phrases::store_as`](crate::Phrases::store_as).
+pub fn initial_with_key(book: &Phrasebook, key: &str) -> Phrases {
+    book.phrases(initial_lang(book, key))
+}
+
+/// The language [`initial_with_key`] opens its handle at, for an app that
+/// wants only the language.
+pub fn initial_lang(book: &Phrasebook, key: &str) -> Lang {
     choose(book, load(key).as_deref(), &preferred())
 }
 
@@ -176,7 +191,9 @@ mod tests {
         store(Lang::new("sv-SE"), DEFAULT_KEY);
         assert_eq!(remembered(&book, DEFAULT_KEY), None);
         assert!(preferred().is_empty());
-        assert_eq!(initial(&book, DEFAULT_KEY), Lang::EN_US);
+        assert_eq!(initial_lang(&book, DEFAULT_KEY), Lang::EN_US);
+        assert_eq!(initial(&book).lang(), Lang::EN_US);
+        assert_eq!(initial_with_key(&book, "other").lang(), Lang::EN_US);
         book.phrases(Lang::new("sv-SE")).store();
     }
 }

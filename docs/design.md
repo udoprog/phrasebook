@@ -439,10 +439,14 @@ pub mod browser {
     pub fn remembered(book: &Phrasebook, key: &str) -> Option<Lang>;
     /// `navigator.languages`, most preferred first.
     pub fn preferred() -> Vec<String>;
-    /// The language to start in: the remembered choice, else the browser's
-    /// preferences negotiated against the declared languages, else the
-    /// fallback.
-    pub fn initial(book: &Phrasebook, key: &str) -> Lang;
+    /// The handle to start with, open at the choice remembered under
+    /// `DEFAULT_KEY`, else the browser's preferences negotiated against the
+    /// declared languages, else the fallback.
+    pub fn initial(book: &Phrasebook) -> Phrases;
+    /// The same, with the choice remembered under another key.
+    pub fn initial_with_key(book: &Phrasebook, key: &str) -> Phrases;
+    /// The language `initial_with_key` opens its handle at.
+    pub fn initial_lang(book: &Phrasebook, key: &str) -> Lang;
 }
 
 impl Phrases {
@@ -453,8 +457,8 @@ impl Phrases {
 }
 ```
 
-An app's root calls `browser::initial` once to choose its starting language,
-`book.phrases(browser::initial(&book, browser::DEFAULT_KEY))`, and on a
+An app's root calls `browser::initial` once for its starting handle,
+`browser::initial(&book)`, and on a
 language the user picked, `phrases.with_lang(lang)` followed by `store()` on
 the new handle. A change the user did not choose (a projector page cycling
 through languages) calls `with_lang` alone.
@@ -606,8 +610,7 @@ The app's root owns the handle, as with any other app state:
 
 ```rust
 // create
-let book = l10n::phrasebook();
-let phrases = book.phrases(browser::initial(&book, browser::DEFAULT_KEY));
+let phrases = browser::initial(&l10n::phrasebook());
 // update, on a language the user picked
 self.phrases = self.phrases.with_lang(lang);
 self.phrases.store();
@@ -676,8 +679,7 @@ pub(crate) fn phrasebook() -> Phrasebook {
 ```
 
 - `Root` builds the handle once, replacing its own `use_memo(L10n::new)`:
-  `use_memo((), |_| { let book = l10n::phrasebook();
-  book.phrases(browser::initial(&book, browser::DEFAULT_KEY)) })` (a
+  `use_memo((), |_| browser::initial(&l10n::phrasebook()))` (a
   `use_state` instead once army has a language to switch to), passes its
   messages to watchword's `AuthProvider`, and renders
   `ContextProvider<Phrases>` around it. `App` reads the provided handle with
@@ -733,8 +735,7 @@ impl LocaleExt for Phrases { fn locale(&self) -> Locale { locale(self.lang()) } 
 
 - `App` keeps owning the handle, since it needs it above the provider for
   the tab title: `L10n::new(l10n::load())` becomes
-  `book.phrases(browser::initial(&book, browser::DEFAULT_KEY))` with
-  `book = l10n::phrasebook()`; `Msg::SetLang` does
+  `browser::initial(&l10n::phrasebook())`; `Msg::SetLang` does
   `self.phrases = self.phrases.with_lang(lang); self.phrases.store();`
   (replacing `l10n::store`); `Msg::CycleLang` does `with_lang` without
   storing. It renders `ContextProvider<Phrases>`. The toolbar's

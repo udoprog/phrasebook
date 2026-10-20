@@ -59,7 +59,7 @@
 //!
 //!     fn create(_: &Context<Self>) -> Self {
 //!         // With the `browser` feature, start from the remembered or
-//!         // preferred language: `browser::initial(&book, browser::DEFAULT_KEY)`.
+//!         // preferred language: `browser::initial(&phrasebook())`.
 //!         let phrases = phrasebook().phrases(Lang::EN_US);
 //!         Self { phrases }
 //!     }

@@ -76,8 +76,7 @@ impl Component for App {
     type Properties = ();
 
     fn create(_: &Context<Self>) -> Self {
-        let book = phrasebook();
-        let phrases = book.phrases(browser::initial(&book, browser::DEFAULT_KEY));
+        let phrases = browser::initial(&phrasebook());
         Self { phrases }
     }
 

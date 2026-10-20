@@ -2,7 +2,7 @@
 //! provides it, a picker changes the language and remembers it, and a
 //! library-style component falls back to its own catalog.
 
-use phrasebook::yew023::{or_catalog, or_default};
+use phrasebook::yew023::{use_phrases, use_phrases_with};
 use phrasebook::{Catalog, Lang, Phrasebook, Phrases, Source, args, browser};
 use yew::prelude::*;
 
@@ -116,7 +116,7 @@ struct PickerProps {
 /// through the app's callback.
 #[function_component]
 fn Picker(props: &PickerProps) -> Html {
-    let phrases = or_default(use_context::<Phrases>());
+    let phrases = use_phrases();
 
     let options = phrases.languages().iter().map(|language| {
         let onclick = props.on_lang.reform({
@@ -139,7 +139,7 @@ fn Picker(props: &PickerProps) -> Html {
 /// Plurals, with an argument.
 #[function_component]
 fn Players() -> Html {
-    let phrases = or_default(use_context::<Phrases>());
+    let phrases = use_phrases();
     let count = use_state(|| 0u32);
 
     let onclick = {
@@ -166,7 +166,7 @@ struct GreetingProps {
 /// and from the library's own English otherwise.
 #[function_component]
 fn Greeting(props: &GreetingProps) -> Html {
-    let phrases = or_catalog(use_context::<Phrases>(), &GREETING);
+    let phrases = use_phrases_with(&GREETING);
 
     html! {
         <p>

@@ -173,15 +173,17 @@ language identifier, catalogs, the dictionary, the `Phrases` handle,
 arguments, the browser helpers, and, behind the `yew023` feature, the
 `phrasebook::yew023` module for yew 0.23.
 
-phrasebook ships no components and no hooks. The context type is the handle
-itself, so an app provides it with yew's own `ContextProvider<Phrases>` and a
-component reads it with yew's own `use_context::<Phrases>()`, or
-`ctx.link().context::<Phrases>(callback)` in a struct component. What
-`yew023` adds is trait impls on `Phrases` (and `Lang` and `Language`) and two plain
-functions for when no handle is provided (2.10).
+phrasebook ships no components. The context type is the handle itself, so
+an app provides it with yew's own `ContextProvider<Phrases>`, and a
+component reads it with the `use_phrases` hook, or keeps a `PhrasesContext`
+in a struct component. What `yew023` adds is trait impls on `Phrases` (and
+`Lang` and `Language`), those hooks and that subscription type, and the
+plain functions for when no handle is provided that they are built on
+(2.10).
 
 None of that needs yew's macros (`html!`, `#[function_component]`,
-`#[derive(Properties)]`, `#[hook]`), which expand to `::yew::` paths and
+`#[derive(Properties)]`, `#[hook]`; the hooks implement yew's `Hook` trait by
+hand), which expand to `::yew::` paths and
 would force yew to be a direct dependency under the key `yew`; watchword
 splits watchword-yew023 out for that reason. phrasebook depends on yew under
 the versioned key `yew023` (`yew023 = { package = "yew", version = "0.23",
@@ -199,7 +201,7 @@ alloc-only build is not a breaking change.
 | `alloc` | nothing yet | nothing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
 | `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.3 (as `koine03`, feature `locale`) |
-| `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the no-provider helpers | yew 0.23 (as `yew023`) |
+| `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the `use_phrases` hooks, `PhrasesContext`, the no-provider helpers | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
 that appears in the public API is named after its version. fluent (0.17,
@@ -569,11 +571,10 @@ reported. Library ids are never required in the app.
 
 ### 2.10 Yew (`yew023`)
 
-phrasebook ships no components and no hooks. The context type is `Phrases`
-itself, so an app provides it with yew's own `ContextProvider<Phrases>` (army
-already does this with its `L10n`) and components read it with yew's own
-`use_context::<Phrases>()`, or `ctx.link().context::<Phrases>(callback)` in a
-struct component. The feature adds only this:
+phrasebook ships no components. The context type is `Phrases` itself, so an
+app provides it with yew's own `ContextProvider<Phrases>` (army already does
+this with its `L10n`) and components read it with `use_phrases`, or a
+`PhrasesContext` in a struct component. The feature adds only this:
 
 ```rust
 pub mod yew023 {
@@ -602,24 +603,40 @@ pub mod yew023 {
     /// The message with `element` where the translation places `name`
     /// (`Phrases::msg_around`); appended if the translation lacks it.
     pub fn html_around(phrases: &Phrases, id: &str, args: &Args, name: &str, element: Html) -> Html;
+
+    /// `or_default` and `or_catalog` over `use_context`, as hooks.
+    pub fn use_phrases() -> impl Hook<Output = Phrases>;
+    pub fn use_phrases_with(catalog: &'static Catalog) -> impl Hook<Output = Phrases>;
+
+    /// A struct component's subscription: the current handle and the
+    /// `ContextHandle`, kept together so the subscription cannot be dropped
+    /// by accident.
+    pub struct PhrasesContext;
+
+    impl PhrasesContext {
+        pub fn new<C: BaseComponent>(link: &Scope<C>, callback: Callback<Phrases>) -> Self;
+        pub fn new_with<C: BaseComponent>(link: &Scope<C>, callback: Callback<Phrases>, catalog: &'static Catalog) -> Self;
+        pub fn phrases(&self) -> &Phrases;
+        /// Takes a later handle, with the backstop; whether it changed.
+        pub fn set(&mut self, phrases: Phrases) -> bool;
+    }
 }
 ```
 
-Both are plain functions over the `Option<Phrases>` that `use_context`
-returns, wrapping the core constructors in 2.5:
+Every user wrapped the context read by hand, and struct components got it
+wrong: reading `ctx.link().context::<Phrases>(Callback::noop())` in `view`
+subscribes nothing, so the component misses language changes. The hooks
+and `PhrasesContext` wrap the core constructors in 2.5:
 
 ```rust
 // A function component.
-let phrases = or_default(use_context::<Phrases>());
+let phrases = use_phrases();
 // A library's function component.
-let phrases = or_catalog(use_context::<Phrases>(), &L10N);
+let phrases = use_phrases_with(&L10N);
 
-// A struct component, in `create`: map the context to its first element and
-// keep the `ContextHandle` to stay subscribed; `Msg::Phrases(Phrases)`
-// receives later handles.
-let context = ctx.link().context::<Phrases>(ctx.link().callback(Msg::Phrases));
-let phrases = or_default(context.as_ref().map(|(phrases, _)| phrases.clone()));
-let handle = context.map(|(_, handle)| handle); // stored in the component
+// A struct component, in `create`; `Msg::Phrases(Phrases)` receives later
+// handles, for `self.l10n.set(phrases)` in `update`.
+let l10n = PhrasesContext::new(ctx.link(), ctx.link().callback(Msg::Phrases));
 ```
 
 The app's root owns the handle, as with any other app state:
@@ -843,8 +860,9 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    and wins. A duplicate is logged at build and fails `check::catalog`.
 5. **The context type is `Phrases`, provided and read with yew's own
    tools.** Every app's root owns the handle as app state and renders
-   `ContextProvider<Phrases>`; components read it with `use_context`. A
-   provider component and hooks would only wrap those, and a callback inside
+   `ContextProvider<Phrases>`; components read it with `use_phrases` (or a
+   `PhrasesContext`), thin wrappers over `use_context`. A provider component
+   would only wrap `ContextProvider`, and a callback inside
    the handle would duplicate what the app already has: changing language is
    `with_lang` (and `store`) at the root, and a deep component (a picker)
    gets a callback from the app like for any other app state.
@@ -856,9 +874,9 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    English never did.
 8. **No provider is not a panic.** A component outside a provider (a test, a
    portal, a library used without phrasebook set up) renders ids, or a
-   library's built-in English, with one warning, as livemix does. These are
-   plain functions over what `use_context` returns, `or_default` and
-   `or_catalog` (2.10), rather than hooks.
+   library's built-in English, with one warning, as livemix does: the plain
+   functions `or_default` and `or_catalog` over what `use_context` returns,
+   which the hooks use (2.10).
 9. **Bundles parse lazily, per language.** livemix's en-US is 3,256 lines;
    parsing languages nobody is reading only slows start-up.
 

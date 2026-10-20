@@ -5,10 +5,11 @@
 
 extern crate yew023 as yew;
 
-use phrasebook::yew023::{html_around, or_catalog, or_default};
+use phrasebook::yew023::{
+    PhrasesContext, html_around, or_catalog, or_default, use_phrases, use_phrases_with,
+};
 use phrasebook::{Args, Catalog, Lang, Phrasebook, Phrases, Source};
 use yew::LocalServerRenderer;
-use yew::context::ContextHandle;
 use yew::html::{ImplicitClone, IntoPropValue};
 use yew::prelude::*;
 use yew::virtual_dom::AttrValue;
@@ -46,13 +47,13 @@ fn phrases(lang: Lang) -> Phrases {
 
 #[function_component]
 fn Title() -> Html {
-    let phrases = or_default(use_context::<Phrases>());
+    let phrases = use_phrases();
     html! { <h1 lang={phrases.lang()}>{phrases.text("title")}</h1> }
 }
 
 #[function_component]
 fn SignIn() -> Html {
-    let phrases = or_catalog(use_context::<Phrases>(), &LIB);
+    let phrases = use_phrases_with(&LIB);
     html! { <b>{phrases.text("lib-sign-in")}</b> }
 }
 
@@ -61,8 +62,7 @@ enum Msg {
 }
 
 struct SignOut {
-    phrases: Phrases,
-    _handle: Option<ContextHandle<Phrases>>,
+    l10n: PhrasesContext,
 }
 
 impl Component for SignOut {
@@ -70,25 +70,43 @@ impl Component for SignOut {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
-        let context = ctx
-            .link()
-            .context::<Phrases>(ctx.link().callback(Msg::Phrases));
-        let phrases = or_catalog(context.as_ref().map(|(p, _)| p.clone()), &LIB);
-        let _handle = context.map(|(_, handle)| handle);
-        Self { phrases, _handle }
+        let l10n = PhrasesContext::new_with(ctx.link(), ctx.link().callback(Msg::Phrases), &LIB);
+        Self { l10n }
     }
 
     fn update(&mut self, _: &Context<Self>, msg: Msg) -> bool {
         match msg {
-            Msg::Phrases(phrases) => {
-                self.phrases = or_catalog(Some(phrases), &LIB);
-                true
-            }
+            Msg::Phrases(phrases) => self.l10n.set(phrases),
         }
     }
 
     fn view(&self, _: &Context<Self>) -> Html {
-        html! { <i>{self.phrases.text("lib-sign-out")}</i> }
+        html! { <i>{self.l10n.phrases().text("lib-sign-out")}</i> }
+    }
+}
+
+/// An app's struct component, with no catalog of its own.
+struct Heading {
+    l10n: PhrasesContext,
+}
+
+impl Component for Heading {
+    type Message = Msg;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        let l10n = PhrasesContext::new(ctx.link(), ctx.link().callback(Msg::Phrases));
+        Self { l10n }
+    }
+
+    fn update(&mut self, _: &Context<Self>, msg: Msg) -> bool {
+        match msg {
+            Msg::Phrases(phrases) => self.l10n.set(phrases),
+        }
+    }
+
+    fn view(&self, _: &Context<Self>) -> Html {
+        html! { <h2>{self.l10n.phrases().text("title")}</h2> }
     }
 }
 
@@ -99,7 +117,7 @@ struct RootProps {
 
 #[function_component]
 fn Root(props: &RootProps) -> Html {
-    let body = html! { <><Title /><SignIn /><SignOut /></> };
+    let body = html! { <><Title /><SignIn /><SignOut /><Heading /></> };
 
     match &props.phrases {
         Some(phrases) => html! {
@@ -118,7 +136,7 @@ fn render(phrases: Option<Phrases>) -> String {
 fn provided() {
     assert_eq!(
         render(Some(phrases(Lang::EN_US))),
-        r#"<h1 lang="en-US">Mafia</h1><b>Log in</b><i>Sign out</i>"#
+        r#"<h1 lang="en-US">Mafia</h1><b>Log in</b><i>Sign out</i><h2>Mafia</h2>"#
     );
 }
 
@@ -128,7 +146,7 @@ fn provided_other_language() {
     // to the app's English; `lib-sign-out` comes from the library's Swedish.
     assert_eq!(
         render(Some(phrases(SV_SE))),
-        r#"<h1 lang="sv-SE">Maffia</h1><b>Log in</b><i>Logga ut</i>"#
+        r#"<h1 lang="sv-SE">Maffia</h1><b>Log in</b><i>Logga ut</i><h2>Maffia</h2>"#
     );
 }
 
@@ -136,7 +154,7 @@ fn provided_other_language() {
 fn not_provided() {
     assert_eq!(
         render(None),
-        r#"<h1 lang="en-US">title</h1><b>Sign in</b><i>Sign out</i>"#
+        r#"<h1 lang="en-US">title</h1><b>Sign in</b><i>Sign out</i><h2>title</h2>"#
     );
 }
 

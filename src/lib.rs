@@ -100,12 +100,11 @@
 //!
 //! ## With yew
 //!
-//! phrasebook ships no components and no hooks: the context type is
-//! [`Phrases`] itself. The app's root owns the handle as app state and
-//! provides it with yew's own `ContextProvider<Phrases>`; on a language change
-//! it provides `phrases.with_lang(lang)` (and, with `browser`, calls
-//! `browser::set_document_lang` and `store`). Components read it with `use_context::<Phrases>()`, or
-//! `ctx.link().context::<Phrases>(..)` in a struct component.
+//! The context type is [`Phrases`] itself. The app's root owns the handle as
+//! app state and provides it with yew's own `ContextProvider<Phrases>`; on a
+//! language change it provides `phrases.with_lang(lang)` (and, with `browser`,
+//! calls `browser::set_document_lang` and `store`). Components read it with
+//! the `use_phrases` hook, or keep a `PhrasesContext` in a struct component.
 //!
 //! ```rust,ignore
 //! // The app's root, in `view`.
@@ -116,10 +115,14 @@
 //! }
 //!
 //! // An app's component.
-//! let phrases = or_default(use_context::<Phrases>());
+//! let phrases = use_phrases();
 //!
 //! // A library's component, with its own catalog `L10N`.
-//! let phrases = or_catalog(use_context::<Phrases>(), &L10N);
+//! let phrases = use_phrases_with(&L10N);
+//!
+//! // A struct component, in `create`; each later handle arrives as a
+//! // message, for `self.l10n.set(phrases)` in `update`.
+//! let l10n = PhrasesContext::new(ctx.link(), ctx.link().callback(Msg::Phrases));
 //! ```
 //!
 //! A library's component falls back to its own catalog for messages the app

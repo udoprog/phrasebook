@@ -441,12 +441,14 @@ pub mod browser {
     pub fn preferred() -> Vec<String>;
     /// The handle to start with, open at the choice remembered under
     /// `DEFAULT_KEY`, else the browser's preferences negotiated against the
-    /// declared languages, else the fallback.
+    /// declared languages, else the fallback; marks the page as in it.
     pub fn initial(book: &Phrasebook) -> Phrases;
     /// The same, with the choice remembered under another key.
     pub fn initial_with_key(book: &Phrasebook, key: &str) -> Phrases;
     /// The language `initial_with_key` opens its handle at.
     pub fn initial_lang(book: &Phrasebook, key: &str) -> Lang;
+    /// Set `<html lang>`, for screen readers and hyphenation.
+    pub fn set_document_lang(lang: Lang);
 }
 
 impl Phrases {
@@ -458,10 +460,11 @@ impl Phrases {
 ```
 
 An app's root calls `browser::initial` once for its starting handle,
-`browser::initial(&book)`, and on a
-language the user picked, `phrases.with_lang(lang)` followed by `store()` on
-the new handle. A change the user did not choose (a projector page cycling
-through languages) calls `with_lang` alone.
+`browser::initial(&book)`, which also sets the page's `<html lang>`, and on
+a language the user picked, `phrases.with_lang(lang)` followed by
+`browser::set_document_lang(lang)` and `store()` on the new handle. A change
+the user did not choose (a projector page cycling through languages) skips
+`store()`.
 
 The key and value format (`"lang"`, `"en-US"`) are the apps' current ones, so
 users keep their choice across the switch. Detection reads the whole

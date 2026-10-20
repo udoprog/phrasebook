@@ -14,13 +14,15 @@
 //! let phrases = browser::initial(&book);
 //! ```
 //!
-//! and when the user picks a language, provides `phrases.with_lang(lang)`
-//! and calls [`store`](crate::Phrases::store) on it, so the choice survives a
-//! reload. A change the user did not choose, such as a projector page
-//! cycling through languages, calls `with_lang` alone.
+//! which also marks the page as being in that language. When the user picks
+//! a language, the root provides `phrases.with_lang(lang)`, calls
+//! [`set_document_lang`] with it, and calls
+//! [`store`](crate::Phrases::store) on the new handle, so the choice survives
+//! a reload. A change the user did not choose, such as a projector page
+//! cycling through languages, skips `store`.
 //!
 //! Outside wasm (an app's host-side tests, say) these functions find
-//! nothing and store nothing.
+//! nothing, store nothing and mark nothing.
 
 use crate::{Lang, Phrasebook, Phrases};
 
@@ -44,6 +46,7 @@ pub fn preferred() -> Vec<String> {
 /// The handle to start with, open at the language remembered under
 /// [`DEFAULT_KEY`], else the browser's preferences negotiated against the
 /// phrasebook's languages ([`Phrasebook::negotiate`]), else the fallback.
+/// Marks the page as being in that language, as [`set_document_lang`].
 ///
 /// Pairs with [`Phrases::store`](crate::Phrases::store).
 pub fn initial(book: &Phrasebook) -> Phrases {
@@ -54,13 +57,23 @@ pub fn initial(book: &Phrasebook) -> Phrases {
 /// sharing its origin with another. Pairs with
 /// [`Phrases::store_as`](crate::Phrases::store_as).
 pub fn initial_with_key(book: &Phrasebook, key: &str) -> Phrases {
-    book.phrases(initial_lang(book, key))
+    let phrases = book.phrases(initial_lang(book, key));
+    set_document_lang(phrases.lang());
+    phrases
 }
 
 /// The language [`initial_with_key`] opens its handle at, for an app that
 /// wants only the language.
 pub fn initial_lang(book: &Phrasebook, key: &str) -> Lang {
     choose(book, load(key).as_deref(), &preferred())
+}
+
+/// Mark the page as being in `lang`: the `lang` attribute of its `<html>`
+/// element, which screen readers, hyphenation and the browser's translation
+/// offer read. [`initial`] does this for the starting language; call it on
+/// every later language change, when providing `phrases.with_lang(lang)`.
+pub fn set_document_lang(lang: Lang) {
+    imp::set_document_lang(&lang.to_string());
 }
 
 fn supported(book: &Phrasebook, tag: Option<&str>) -> Option<Lang> {
@@ -98,6 +111,16 @@ mod imp {
         }
     }
 
+    pub(super) fn set_document_lang(tag: &str) {
+        if let Some(root) = web_sys::window()
+            .and_then(|window| window.document())
+            .and_then(|document| document.document_element())
+        {
+            // Nothing to do about a page that refuses the attribute.
+            let _ = root.set_attribute("lang", tag);
+        }
+    }
+
     pub(super) fn preferred() -> Vec<String> {
         let Some(window) = web_sys::window() else {
             return Vec::new();
@@ -128,6 +151,8 @@ mod imp {
     }
 
     pub(super) fn store(_value: &str, _key: &str) {}
+
+    pub(super) fn set_document_lang(_tag: &str) {}
 
     pub(super) fn preferred() -> Vec<String> {
         Vec::new()

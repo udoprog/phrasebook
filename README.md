@@ -94,8 +94,8 @@ asks for with the ones a catalog defines, both ways.
 phrasebook ships no components and no hooks: the context type is
 [`Phrases`] itself. The app's root owns the handle as app state and
 provides it with yew's own `ContextProvider<Phrases>`; on a language change
-it provides `phrases.with_lang(lang)` (and calls `store` on it, with
-`browser`). Components read it with `use_context::<Phrases>()`, or
+it provides `phrases.with_lang(lang)` (and, with `browser`, calls
+`browser::set_document_lang` and `store`). Components read it with `use_context::<Phrases>()`, or
 `ctx.link().context::<Phrases>(..)` in a struct component.
 
 ```rust

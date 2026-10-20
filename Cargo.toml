@@ -34,7 +34,7 @@ yew023 = { package = "yew", version = "0.23.0", optional = true }
 koine01 = { package = "koine", version = "0.1.0", default-features = false, features = ["locale"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-web-sys = { version = "0.3.77", features = ["Window", "Navigator", "Storage"], optional = true }
+web-sys = { version = "0.3.77", features = ["Document", "Element", "Navigator", "Storage", "Window"], optional = true }
 
 # Cargo allows one key per crate, so tests use `extern crate yew023 as yew;`
 # for yew's macros.

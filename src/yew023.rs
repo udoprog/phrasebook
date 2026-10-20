@@ -18,8 +18,9 @@
 //! # Providing the handle
 //!
 //! The app's root owns the handle as app state. On a language change it
-//! calls [`Phrases::with_lang`] (and `Phrases::store` with the `browser`
-//! feature, to remember the choice) and provides the new handle, which
+//! calls [`Phrases::with_lang`] (and with the `browser` feature,
+//! `browser::set_document_lang` to mark the page and `Phrases::store` to
+//! remember the choice) and provides the new handle, which
 //! re-renders every component reading it. A component deep in the tree
 //! that changes the language, such as a picker, gets a `Callback<Lang>`
 //! from the app like for any other app state.
@@ -68,7 +69,8 @@
 //!         match msg {
 //!             Msg::SetLang(lang) => {
 //!                 self.phrases = self.phrases.with_lang(lang);
-//!                 // With the `browser` feature: `self.phrases.store();`
+//!                 // With the `browser` feature:
+//!                 // `browser::set_document_lang(lang); self.phrases.store();`
 //!                 true
 //!             }
 //!         }

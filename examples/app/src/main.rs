@@ -84,6 +84,7 @@ impl Component for App {
         match msg {
             Msg::SetLang(lang) => {
                 self.phrases = self.phrases.with_lang(lang);
+                browser::set_document_lang(lang);
                 self.phrases.store();
                 true
             }

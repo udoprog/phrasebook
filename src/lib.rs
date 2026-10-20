@@ -78,9 +78,10 @@
 //!
 //! In an app's tests, [`check`] turns a catalog's problems (syntax errors,
 //! duplicate ids, ids outside the prefix, messages that do not format, and
-//! untranslated or extra messages) into failures; an app that translates a
-//! library's messages in its own catalog checks parity with
-//! `check::parity_with`, naming the library catalogs.
+//! untranslated or extra messages) into failures. `check::all` runs every
+//! check of a catalog in every language at once, naming the library catalogs
+//! the app translates, and `Phrasebook::has_catalog` asserts that a
+//! library's catalog was added.
 //!
 //! <br>
 //!

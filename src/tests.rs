@@ -636,6 +636,44 @@ app sv-SE: `c` is defined neither in en-US nor in any given library"
     assert_eq!(problems, check::parity(&APP, SV_SE).unwrap_err());
 }
 
+#[test]
+fn check_all() {
+    // One report: the catalog's own problems, then parity in each other
+    // language, once per language even with a second source for it.
+    static ALL: Catalog = Catalog::new(
+        "app",
+        &[
+            Source::new(Lang::EN_US, "a = A\nb = B\nb = Again\n"),
+            Source::new(SV_SE, "a = A\nlib-sign-in = Logga in\n"),
+            Source::new(DE_DE, "a = A\nb = B\nc = C\n"),
+            Source::new(SV_SE, "a = A\n"),
+        ],
+    );
+
+    let problems = check::all(&ALL, &[&LIB]).unwrap_err();
+    assert_eq!(
+        problems.to_string(),
+        "\
+app en-US: `b` is defined twice
+app sv-SE: a second source for this language, which is ignored
+app sv-SE: `b` is missing (defined in en-US)
+app de-DE: `c` is defined neither in en-US nor in any given library"
+    );
+
+    assert_eq!(check::all_ids(&ALL), ["a", "b", "lib-sign-in", "c"]);
+}
+
+#[test]
+fn has_catalog() {
+    let book = Phrasebook::builder()
+        .language(Lang::EN_US, "English")
+        .catalog(&APP)
+        .build();
+
+    assert!(book.has_catalog(&APP));
+    assert!(!book.has_catalog(&LIB));
+}
+
 #[cfg(feature = "koine01")]
 #[test]
 fn koine01_warns_about_unknown_languages() {

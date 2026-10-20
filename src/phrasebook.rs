@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::collections::HashSet;
 use std::collections::hash_map::{Entry, HashMap};
 use std::fmt;
+use std::ptr;
 use std::rc::Rc;
 
 use fluent_bundle::{FluentArgs, FluentError, FluentResource, FluentValue};
@@ -104,6 +105,31 @@ impl Phrasebook {
     /// is looked up next.
     pub fn fallback(&self) -> Lang {
         self.inner.fallback
+    }
+
+    /// Whether `catalog` was added with [`Builder::catalog`], for an app's
+    /// test that a library's catalog is in its phrasebook. Catalogs are
+    /// compared by identity, so declare them as `static`s.
+    ///
+    /// ```
+    /// use phrasebook::{Catalog, Lang, Phrasebook, Source};
+    ///
+    /// static APP: Catalog = Catalog::new("app", &[Source::new(Lang::EN_US, "title = App\n")]);
+    /// static LIB: Catalog = Catalog::new("lib", &[Source::new(Lang::EN_US, "lib-ok = OK\n")]);
+    ///
+    /// let book = Phrasebook::builder()
+    ///     .language(Lang::EN_US, "English")
+    ///     .catalog(&APP)
+    ///     .build();
+    ///
+    /// assert!(book.has_catalog(&APP));
+    /// assert!(!book.has_catalog(&LIB));
+    /// ```
+    pub fn has_catalog(&self, catalog: &Catalog) -> bool {
+        self.inner
+            .catalogs
+            .iter()
+            .any(|added| ptr::eq(*added, catalog))
     }
 
     /// Whether `lang` is declared, or is the fallback.

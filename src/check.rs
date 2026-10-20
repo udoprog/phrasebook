@@ -30,6 +30,34 @@
 //! lib en-US: `lib-a` is defined twice
 //! lib en-US: `b` does not start with the catalog's prefix `lib-`");
 //! ```
+//!
+//! An app's test module usually needs only [`all`], naming the library
+//! catalogs it translates, and [`Phrasebook::has_catalog`] for each of them:
+//!
+//! ```
+//! use phrasebook::{Catalog, Lang, Phrasebook, Source, check};
+//!
+//! # static LIB: Catalog = Catalog::new("lib", &[Source::new(Lang::EN_US, "lib-ok = OK\n")]).with_prefix("lib-");
+//! static L10N: Catalog = Catalog::new("app", &[
+//!     Source::new(Lang::EN_US, "title = App\n"),
+//!     Source::new(Lang::new("sv-SE"), "title = App\nlib-ok = Okej\n"),
+//! ]);
+//!
+//! fn phrasebook() -> Phrasebook {
+//!     Phrasebook::builder()
+//!         .language(Lang::EN_US, "English")
+//!         .language(Lang::new("sv-SE"), "Svenska")
+//!         .catalog(&L10N)
+//!         .catalog(&LIB)
+//!         .build()
+//! }
+//!
+//! // In `#[test]` functions:
+//! check::all(&L10N, &[&LIB]).unwrap();
+//! assert!(phrasebook().has_catalog(&LIB));
+//! ```
+//!
+//! [`Phrasebook::has_catalog`]: crate::Phrasebook::has_catalog
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -241,6 +269,73 @@ pub fn parity_with(catalog: &Catalog, lang: Lang, libraries: &[&Catalog]) -> Res
     problems.into_result()
 }
 
+/// Every check of a catalog in one report: [`catalog`], and
+/// [`parity_with`] `libraries` for every language besides the default, so a
+/// language added later is checked without touching the test.
+///
+/// ```
+/// use phrasebook::{Catalog, Lang, Source, check};
+///
+/// const SV_SE: Lang = Lang::new("sv-SE");
+///
+/// static LIB: Catalog = Catalog::new("lib", &[
+///     Source::new(Lang::EN_US, "lib-sign-in = Sign in\n"),
+/// ])
+/// .with_prefix("lib-");
+///
+/// static APP: Catalog = Catalog::new("app", &[
+///     Source::new(Lang::EN_US, "title = Mafia\nrules = Rules\n"),
+///     Source::new(SV_SE, "title = Maffia\nlib-sign-in = Logga in\n"),
+/// ]);
+///
+/// let problems = check::all(&APP, &[&LIB]).unwrap_err();
+/// assert_eq!(problems.to_string(), "app sv-SE: `rules` is missing (defined in en-US)");
+/// ```
+pub fn all(catalog: &Catalog, libraries: &[&Catalog]) -> Result<(), Problems> {
+    let mut problems = Problems::default();
+    problems.extend(self::catalog(catalog));
+
+    let default = catalog.default_lang();
+    let mut seen = HashSet::new();
+
+    for lang in catalog.languages() {
+        if Some(lang) != default && seen.insert(lang) {
+            problems.extend(parity_with(catalog, lang, libraries));
+        }
+    }
+
+    problems.into_result()
+}
+
+/// The message ids a catalog defines in any language, each once: the
+/// default language's in file order, then any other language's extras.
+/// For a library's ids, which an app's own checks of coverage exempt.
+///
+/// ```
+/// use phrasebook::{Catalog, Lang, Source, check};
+///
+/// static LIB: Catalog = Catalog::new("lib", &[
+///     Source::new(Lang::EN_US, "a = A\nb = B\n"),
+///     Source::new(Lang::new("sv-SE"), "b = B\nc = C\n"),
+/// ]);
+///
+/// assert_eq!(check::all_ids(&LIB), ["a", "b", "c"]);
+/// ```
+pub fn all_ids(catalog: &Catalog) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+
+    for lang in catalog.languages() {
+        for id in ids(catalog, lang) {
+            if seen.insert(id.clone()) {
+                out.push(id);
+            }
+        }
+    }
+
+    out
+}
+
 /// The message ids a catalog defines in `lang`, in file order, each once.
 /// Empty if the catalog has no source for `lang`. Whatever parses is
 /// listed, so a source with syntax errors still lists the rest.
@@ -320,6 +415,12 @@ impl Problems {
             lang,
             message,
         });
+    }
+
+    fn extend(&mut self, result: Result<(), Problems>) {
+        if let Err(other) = result {
+            self.problems.extend(other.problems);
+        }
     }
 
     fn into_result(self) -> Result<(), Problems> {

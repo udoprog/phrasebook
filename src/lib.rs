@@ -115,6 +115,10 @@
 //! lacks, or to the catalog alone when nothing is provided. The [`yew023`]
 //! module documents both forms in full, struct components included.
 //!
+//! To put markup where a translation places an argument, such as a user's
+//! name in `<strong>`, `yew023::html_around` renders the message around an
+//! element (`Phrases::msg_around` gives the text on either side).
+//!
 //! <br>
 //!
 //! ## Examples
@@ -185,7 +189,7 @@ pub use self::args::{Args, Value, args};
 pub use self::catalog::{Catalog, Source};
 pub use self::lang::{Lang, ParseLangError};
 pub use self::phrasebook::{Builder, Language, Phrasebook};
-pub use self::phrases::Phrases;
+pub use self::phrases::{Around, Phrases};
 
 #[cfg(test)]
 mod tests;

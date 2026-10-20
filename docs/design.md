@@ -591,6 +591,10 @@ pub mod yew023 {
     /// `Phrases::from_catalog(catalog)`, the library's catalog alone in its
     /// default language.
     pub fn or_catalog(phrases: Option<Phrases>, catalog: &'static Catalog) -> Phrases;
+
+    /// The message with `element` where the translation places `name`
+    /// (`Phrases::msg_around`); appended if the translation lacks it.
+    pub fn html_around(phrases: &Phrases, id: &str, args: &Args, name: &str, element: Html) -> Html;
 }
 ```
 

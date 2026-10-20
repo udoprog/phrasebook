@@ -11,6 +11,8 @@
 //! * [`IntoPropValue`] from [`Lang`] into `AttrValue`, for an element's
 //!   `lang` attribute (the `Rc<str>` from [`Phrases::text`] already converts
 //!   into `AttrValue` and into children);
+//! * [`html_around`], for markup where a translation places an argument,
+//!   such as a user's name in `<strong>`;
 //! * [`or_default`] and [`or_catalog`], plain functions over the
 //!   `Option<Phrases>` that `use_context` returns, for a component rendered
 //!   where nothing provides a handle.
@@ -200,10 +202,11 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use yew023::Html;
 use yew023::html::{ImplicitClone, IntoPropValue};
 use yew023::virtual_dom::AttrValue;
 
-use crate::{Catalog, Lang, Language, Phrases};
+use crate::{Args, Catalog, Lang, Language, Phrases};
 
 /// Cheap to clone: an `Rc` and a few words.
 impl ImplicitClone for Phrases {}
@@ -290,4 +293,43 @@ pub fn or_catalog(phrases: Option<Phrases>, catalog: &'static Catalog) -> Phrase
         Some(phrases) => phrases.with_backstop(catalog),
         None => Phrases::from_catalog(catalog),
     }
+}
+
+/// The message `id` with `element` where the translation places the
+/// argument `name`, such as a user's name in `<strong>` or a value in
+/// `<code>`, from [`Phrases::msg_around`]. A translation that does not use
+/// `name` gets `element` after its text, so the content is not lost.
+///
+/// ```
+/// # extern crate yew023 as yew;
+/// use phrasebook::{Args, Phrases};
+/// use phrasebook::yew023::html_around;
+/// use yew::prelude::*;
+///
+/// // removed = Removed { $user } from the team
+/// fn removed(phrases: &Phrases, user: &str) -> Html {
+///     html_around(phrases, "removed", &Args::new(), "user", html! { <strong>{user}</strong> })
+/// }
+/// ```
+pub fn html_around(
+    phrases: &Phrases,
+    id: &str,
+    args: &Args<'_>,
+    name: &str,
+    element: Html,
+) -> Html {
+    let around = phrases.msg_around(id, args, name);
+    let mut nodes = Vec::with_capacity(3);
+
+    if !around.before.is_empty() {
+        nodes.push(Html::from(around.before));
+    }
+
+    nodes.push(element);
+
+    if let Some(after) = around.after.filter(|after| !after.is_empty()) {
+        nodes.push(Html::from(after));
+    }
+
+    nodes.into_iter().collect()
 }

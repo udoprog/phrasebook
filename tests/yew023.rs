@@ -5,8 +5,8 @@
 
 extern crate yew023 as yew;
 
-use phrasebook::yew023::{or_catalog, or_default};
-use phrasebook::{Catalog, Lang, Phrasebook, Phrases, Source};
+use phrasebook::yew023::{html_around, or_catalog, or_default};
+use phrasebook::{Args, Catalog, Lang, Phrasebook, Phrases, Source};
 use yew::LocalServerRenderer;
 use yew::context::ContextHandle;
 use yew::html::{ImplicitClone, IntoPropValue};
@@ -158,4 +158,59 @@ fn traits() {
     assert_eq!(&*value, "sv-SE");
     let value: Option<AttrValue> = Lang::EN_US.into_prop_value();
     assert_eq!(value.as_deref(), Some("en-US"));
+}
+
+#[test]
+fn around() {
+    static AROUND: Catalog = Catalog::new(
+        "app",
+        &[
+            Source::new(
+                Lang::EN_US,
+                "removed = Removed { $user } from { $team }\nempty = Nobody\n",
+            ),
+            Source::new(SV_SE, "removed = { $user } togs bort\n"),
+        ],
+    );
+
+    let book = Phrasebook::builder()
+        .language(Lang::EN_US, "English")
+        .language(SV_SE, "Svenska")
+        .catalog(&AROUND)
+        .build();
+
+    #[derive(Properties, PartialEq)]
+    struct Props {
+        phrases: Phrases,
+        id: &'static str,
+    }
+
+    #[function_component]
+    fn Removed(props: &Props) -> Html {
+        let args = Args::new().with("team", "Red");
+        html_around(
+            &props.phrases,
+            props.id,
+            &args,
+            "user",
+            html! { <b>{"Ada"}</b> },
+        )
+    }
+
+    let render = |lang, id| {
+        let props = Props {
+            phrases: book.phrases(lang),
+            id,
+        };
+        let renderer = LocalServerRenderer::<Removed>::with_props(props).hydratable(false);
+        futures::executor::block_on(renderer.render())
+    };
+
+    assert_eq!(
+        render(Lang::EN_US, "removed"),
+        "Removed <b>Ada</b> from Red"
+    );
+    assert_eq!(render(SV_SE, "removed"), "<b>Ada</b> togs bort");
+    // Without the argument, the element follows the text.
+    assert_eq!(render(Lang::EN_US, "empty"), "Nobody<b>Ada</b>");
 }

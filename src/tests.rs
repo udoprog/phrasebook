@@ -637,6 +637,40 @@ app sv-SE: `c` is defined neither in en-US nor in any given library"
 }
 
 #[test]
+fn msg_around() {
+    static AROUND: Catalog = Catalog::new(
+        "app",
+        &[Source::new(
+            Lang::EN_US,
+            "twice = { $user } and { $user } again\nlast = Hello { $user }\n",
+        )],
+    );
+
+    for isolating in [false, true] {
+        let book = Phrasebook::builder()
+            .language(Lang::EN_US, "English")
+            .catalog(&AROUND)
+            .use_isolating(isolating)
+            .build();
+        let phrases = book.phrases(Lang::EN_US);
+
+        // A value given for the argument is ignored; later uses are dropped.
+        let around = phrases.msg_around("twice", &Args::new().with("user", "Ada"), "user");
+        assert_eq!(around.before, "");
+        assert_eq!(around.after.as_deref(), Some(" and  again"), "{isolating}");
+
+        let around = phrases.msg_around("last", &Args::new(), "user");
+        assert_eq!(around.before, "Hello ");
+        assert_eq!(around.after.as_deref(), Some(""));
+
+        // A missing message is its id, without the argument.
+        let around = phrases.msg_around("missing", &Args::new(), "user");
+        assert_eq!(around.before, "missing");
+        assert_eq!(around.after, None);
+    }
+}
+
+#[test]
 fn check_all() {
     // One report: the catalog's own problems, then parity in each other
     // language, once per language even with a second source for it.

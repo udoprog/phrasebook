@@ -118,6 +118,10 @@ A library's component falls back to its own catalog for messages the app
 lacks, or to the catalog alone when nothing is provided. The [`yew023`]
 module documents both forms in full, struct components included.
 
+To put markup where a translation places an argument, such as a user's
+name in `<strong>`, `yew023::html_around` renders the message around an
+element (`Phrases::msg_around` gives the text on either side).
+
 <br>
 
 ## Examples

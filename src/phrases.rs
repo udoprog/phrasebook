@@ -270,6 +270,78 @@ impl Phrases {
         Some(text)
     }
 
+    /// A message split where the translation places the argument `name`,
+    /// for markup in its place, such as a user's name in `<strong>`: the
+    /// text before it and, if the message uses `name`, the text after it.
+    /// The other arguments are formatted as in [`Phrases::msg`], and a
+    /// value `args` gives for `name` is ignored. If the message uses `name`
+    /// more than once, the split is at the first use and later uses are
+    /// left out.
+    ///
+    /// ```
+    /// use phrasebook::{Args, Catalog, Lang, Phrasebook, Source, args};
+    ///
+    /// const SV_SE: Lang = Lang::new("sv-SE");
+    ///
+    /// static APP: Catalog = Catalog::new("app", &[
+    ///     Source::new(Lang::EN_US, "removed = Removed { $user } from { $team }\nempty = Nobody here\n"),
+    ///     Source::new(SV_SE, "removed = { $user } togs bort från { $team }\n"),
+    /// ]);
+    ///
+    /// let book = Phrasebook::builder()
+    ///     .language(Lang::EN_US, "English")
+    ///     .language(SV_SE, "Svenska")
+    ///     .catalog(&APP)
+    ///     .build();
+    ///
+    /// let around = book.phrases(SV_SE).msg_around("removed", &args!(team = "Röd"), "user");
+    /// assert_eq!(around.before, "");
+    /// assert_eq!(around.after.as_deref(), Some(" togs bort från Röd"));
+    ///
+    /// // A message without the argument.
+    /// let around = book.phrases(Lang::EN_US).msg_around("empty", &Args::new(), "user");
+    /// assert_eq!(around.before, "Nobody here");
+    /// assert_eq!(around.after, None);
+    /// ```
+    pub fn msg_around(&self, id: &str, args: &Args<'_>, name: &str) -> Around {
+        // A private use character, which no message contains.
+        const MARK: &str = "\u{E000}";
+        // Bidi isolation around an argument, with `use_isolating`.
+        const ISOLATES: [char; 2] = ['\u{2068}', '\u{2069}'];
+        const ISOLATED: &str = "\u{2068}\u{E000}\u{2069}";
+
+        let mut marked = Args::new();
+
+        for (key, value) in args.inner.iter() {
+            if key != name {
+                marked.inner.set(key, value.clone());
+            }
+        }
+
+        marked.inner.set(name, MARK);
+        let text = self.msg(id, &marked);
+
+        match text.split_once(MARK) {
+            Some((before, after)) => Around {
+                before: before
+                    .strip_suffix(ISOLATES[0])
+                    .unwrap_or(before)
+                    .to_owned(),
+                after: Some(
+                    after
+                        .strip_prefix(ISOLATES[1])
+                        .unwrap_or(after)
+                        .replace(ISOLATED, "")
+                        .replace(MARK, ""),
+                ),
+            },
+            None => Around {
+                before: text,
+                after: None,
+            },
+        }
+    }
+
     fn missing(&self, id: &str) {
         if self.book.inner.first_miss(self.lang, id) {
             tracing::warn!(lang = %self.lang, id, "phrasebook: message missing");
@@ -286,6 +358,18 @@ impl Phrases {
             );
         }
     }
+}
+
+/// A message split where the translation places an argument, from
+/// [`Phrases::msg_around`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Around {
+    /// The text before the argument, or the whole message if it does not
+    /// use the argument.
+    pub before: String,
+    /// The text after the argument; `None` if the message does not use it.
+    pub after: Option<String>,
 }
 
 #[cfg(feature = "browser")]

@@ -61,6 +61,7 @@ title = Maffia
 "),
 ]);
 
+// The first declared language is the fallback.
 let book = Phrasebook::builder()
     .language(Lang::EN_US, "English")
     .language(SV_SE, "Svenska")

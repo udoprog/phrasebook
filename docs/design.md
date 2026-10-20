@@ -315,6 +315,8 @@ impl Builder {
     /// Declare a supported language, in picker order. The first is the
     /// fallback unless `fallback` says otherwise.
     pub fn language(self, lang: Lang, name: &'static str) -> Self;
+    /// Each of a list, in order, as `language`.
+    pub fn languages(self, languages: impl IntoIterator<Item = (Lang, &'static str)>) -> Self;
     pub fn fallback(self, lang: Lang) -> Self;
     /// Add a catalog. Earlier catalogs win a duplicate id, so the app adds
     /// its own first and can override a library's message (see 4.4).

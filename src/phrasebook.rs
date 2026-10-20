@@ -243,6 +243,32 @@ impl Builder {
         self
     }
 
+    /// Declare each language of a list with its name in itself, in order, as
+    /// [`Builder::language`] does: the first is the fallback unless
+    /// [`Builder::fallback`] says otherwise. For an app whose languages come
+    /// from a table of its own.
+    ///
+    /// ```
+    /// use phrasebook::{Lang, Phrasebook};
+    ///
+    /// const LANGUAGES: &[(Lang, &str)] = &[
+    ///     (Lang::new("sv-SE"), "Svenska"),
+    ///     (Lang::EN_US, "English"),
+    /// ];
+    ///
+    /// let book = Phrasebook::builder()
+    ///     .languages(LANGUAGES.iter().copied())
+    ///     .build();
+    ///
+    /// assert_eq!(book.languages().len(), 2);
+    /// assert_eq!(book.fallback(), Lang::new("sv-SE"));
+    /// ```
+    pub fn languages(self, languages: impl IntoIterator<Item = (Lang, &'static str)>) -> Self {
+        languages
+            .into_iter()
+            .fold(self, |builder, (lang, name)| builder.language(lang, name))
+    }
+
     /// Declare a supported language named by koine's English reference
     /// name, such as `"Swedish"` for `sv-SE`, for an app with no name of
     /// the language in itself to hand. The region is not part of the name,
@@ -274,8 +300,9 @@ impl Builder {
         self.language(lang, name)
     }
 
-    /// Set the fallback language. It should be declared; if it is not, it
-    /// still gets a bundle but is not listed in
+    /// Set the fallback language, for a fallback other than the first
+    /// declared language, which is the fallback without this. It should be
+    /// declared; if it is not, it still gets a bundle but is not listed in
     /// [`Phrasebook::languages`].
     pub fn fallback(mut self, lang: Lang) -> Self {
         self.fallback = Some(lang);

@@ -21,7 +21,7 @@ rustdoc-args = ["--cfg", "phrasebook_docsrs"]
 
 [features]
 default = []
-browser = ["dep:web-sys"]
+browser = ["dep:web-sys", "dep:js-sys", "dep:wasm-bindgen", "dep:intl-memoizer"]
 yew023 = ["dep:yew023"]
 koine01 = ["dep:koine01"]
 
@@ -35,6 +35,9 @@ koine01 = { package = "koine", version = "0.1.0", default-features = false, feat
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "0.3.77", features = ["Document", "Element", "Navigator", "Storage", "Window"], optional = true }
+js-sys = { version = "0.3.77", optional = true }
+wasm-bindgen = { version = "0.2.100", optional = true }
+intl-memoizer = { version = "0.5.3", optional = true }
 
 # Cargo allows one key per crate, so tests use `extern crate yew023 as yew;`
 # for yew's macros.

@@ -28,7 +28,7 @@ marked with it.
 | Feature | Module | What it provides |
 |---|---|---|
 | *(none)* | | [`Lang`], [`Catalog`], [`Source`], [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
-| `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, and `Phrases::store` |
+| `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, `Phrases::store`, and numbers formatted in the handle's language |
 | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
 | `koine01` | [`koine01`] | conversions between [`Lang`] and koine 0.1's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |
 
@@ -79,6 +79,14 @@ assert_eq!(&*phrases.text("missing"), "missing");
 let phrases = phrases.with_lang(Lang::EN_US);
 assert_eq!(phrases.msg("players", &args!(count = "4")), "4 players");
 ```
+
+Pass numbers as numbers, not as strings formatted beforehand. With
+`browser`, in the browser, a number is formatted in the handle's language
+(`12,345` in English, `12 345` in Swedish), honouring `NUMBER()`'s options
+in the message; a string is shown as written. A number that is not a
+quantity, such as a year, is passed as a string, or formatted with
+`NUMBER($year, useGrouping: "false")`. `Phrases::number` formats a number
+shown outside a message the same way.
 
 In an app's tests, [`check`] turns a catalog's problems (syntax errors,
 duplicate ids, ids outside the prefix, messages that do not format, and

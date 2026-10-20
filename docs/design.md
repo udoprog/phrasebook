@@ -193,7 +193,7 @@ No feature is on by default.
 | Feature | Enables | Pulls in |
 |---|---|---|
 | *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
-| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store` | web-sys (on wasm32 only) |
+| `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
 | `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.1 (as `koine01`, feature `locale`) |
 | `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the no-provider helpers | yew 0.23 (as `yew023`) |
 
@@ -323,6 +323,9 @@ impl Builder {
     pub fn catalog(self, catalog: &'static Catalog) -> Self;
     /// Bidi isolation marks around placeables; off by default (4.6).
     pub fn use_isolating(self, on: bool) -> Self;
+    /// With `browser` in the browser, numbers through `Intl.NumberFormat`
+    /// in the bundle's language (a fluent formatter). On by default.
+    pub fn locale_numbers(self, on: bool) -> Self;
     pub fn build(self) -> Phrasebook;
 }
 ```

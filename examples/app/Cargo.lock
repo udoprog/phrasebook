@@ -505,8 +505,11 @@ version = "0.1.0"
 dependencies = [
  "fluent-bundle",
  "fluent-syntax",
+ "intl-memoizer",
+ "js-sys",
  "tracing",
  "unic-langid",
+ "wasm-bindgen",
  "web-sys",
  "yew",
 ]

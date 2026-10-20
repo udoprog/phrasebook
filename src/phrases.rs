@@ -2,6 +2,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
+use fluent_bundle::types::{FluentNumber, FluentNumberOptions};
+
 use crate::{Args, Catalog, Lang, Language, Phrasebook};
 
 /// The handle components use: a [`Phrasebook`] open at one language.
@@ -268,6 +270,32 @@ impl Phrases {
         let text = backstop.book.inner.format(lang, id, Some(args), true)?;
         self.backstopped(id, backstop);
         Some(text)
+    }
+
+    /// A number shown outside a message, such as in a table cell, formatted
+    /// as numbers in messages are (see [`Builder::locale_numbers`]): in the
+    /// handle's language in the browser, as fluent does elsewhere. For
+    /// other options, pass the number to a message using `NUMBER()`.
+    ///
+    /// ```
+    /// use phrasebook::Phrases;
+    ///
+    /// // Outside the browser.
+    /// assert_eq!(Phrases::empty().number(12345.5), "12345.5");
+    /// ```
+    ///
+    /// [`Builder::locale_numbers`]: crate::Builder::locale_numbers
+    pub fn number(&self, value: f64) -> String {
+        let number = FluentNumber::new(value, FluentNumberOptions::default());
+
+        #[cfg(all(feature = "browser", target_arch = "wasm32"))]
+        if self.book.inner.locale_numbers
+            && let Some(text) = crate::intl::number(self.lang, &number)
+        {
+            return text;
+        }
+
+        number.as_string().into_owned()
     }
 
     /// A message split where the translation places the argument `name`,

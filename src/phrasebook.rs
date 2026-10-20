@@ -87,6 +87,7 @@ impl Phrasebook {
             fallback: None,
             catalogs: Vec::new(),
             use_isolating: false,
+            locale_numbers: true,
         }
     }
 
@@ -228,6 +229,7 @@ pub struct Builder {
     fallback: Option<Lang>,
     catalogs: Vec<&'static Catalog>,
     use_isolating: bool,
+    locale_numbers: bool,
 }
 
 impl Builder {
@@ -329,6 +331,21 @@ impl Builder {
         self
     }
 
+    /// Whether numbers are formatted in the handle's language, with the
+    /// `browser` feature in the browser: `12345.5` as `12,345.5` in
+    /// `en-US` and `12 345,5` in `sv-SE`, through the browser's
+    /// `Intl.NumberFormat`, honouring `NUMBER()`'s options in a message
+    /// (such as `minimumFractionDigits`, `useGrouping` and
+    /// `style: "percent"`). On by default.
+    ///
+    /// Elsewhere, such as in an app's host-side tests, numbers are formatted
+    /// as fluent does: no grouping and a `.` decimal separator, the same in
+    /// every language.
+    pub fn locale_numbers(mut self, on: bool) -> Self {
+        self.locale_numbers = on;
+        self
+    }
+
     /// Build the phrasebook. Nothing is parsed yet.
     ///
     /// With the `koine01` feature, a declared language koine does not know
@@ -367,6 +384,7 @@ impl Builder {
                 bundles,
                 catalogs: self.catalogs.into(),
                 use_isolating: self.use_isolating,
+                locale_numbers: self.locale_numbers,
                 texts: RefCell::new(HashMap::new()),
                 logged: RefCell::new(HashMap::new()),
                 errors_logged: RefCell::new(HashSet::new()),
@@ -384,6 +402,7 @@ pub(crate) struct Inner {
     bundles: Box<[OnceCell<LangBundle>]>,
     catalogs: Box<[&'static Catalog]>,
     use_isolating: bool,
+    pub(crate) locale_numbers: bool,
     /// Plain texts, resolved once per language and id; `None` when neither
     /// the language nor the fallback defines the id.
     texts: RefCell<HashMap<Lang, Texts>>,
@@ -404,7 +423,7 @@ impl Inner {
     }
 
     fn build_bundle(&self, lang: Lang) -> LangBundle {
-        let mut bundle = new_bundle(lang, self.use_isolating);
+        let mut bundle = new_bundle(lang, self.use_isolating, self.locale_numbers);
         // Where each id was first defined, by catalog index; terms keep
         // their leading `-`, as they are a namespace of their own.
         let mut seen = HashMap::<String, usize>::new();
@@ -609,7 +628,7 @@ impl LangBundle {
 }
 
 /// A new empty bundle for `lang` with the built-in functions.
-pub(crate) fn new_bundle(lang: Lang, use_isolating: bool) -> Bundle {
+pub(crate) fn new_bundle(lang: Lang, use_isolating: bool, locale_numbers: bool) -> Bundle {
     let langid = lang
         .to_string()
         .parse::<LanguageIdentifier>()
@@ -619,6 +638,15 @@ pub(crate) fn new_bundle(lang: Lang, use_isolating: bool) -> Bundle {
     bundle.set_use_isolating(use_isolating);
     // Only fails if a function is already defined, and the bundle is new.
     let _ = bundle.add_builtins();
+
+    #[cfg(all(feature = "browser", target_arch = "wasm32"))]
+    if locale_numbers {
+        bundle.set_formatter(Some(crate::intl::format));
+    }
+
+    #[cfg(not(all(feature = "browser", target_arch = "wasm32")))]
+    let _ = locale_numbers;
+
     bundle
 }
 

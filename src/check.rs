@@ -143,7 +143,7 @@ fn check_source(catalog: &Catalog, source: &Source, report: &mut dyn FnMut(Strin
         })
         .collect::<Vec<_>>();
 
-    let mut bundle = new_bundle(source.lang(), false);
+    let mut bundle = new_bundle(source.lang(), false, false);
     // Duplicates are reported above.
     let _ = bundle.add_resource(resource);
 

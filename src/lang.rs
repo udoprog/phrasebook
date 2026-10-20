@@ -256,6 +256,9 @@ impl core::error::Error for ParseLangError {}
 
 #[cfg(test)]
 mod tests {
+    use std::format;
+    use std::string::ToString;
+
     use super::Lang;
 
     #[test]

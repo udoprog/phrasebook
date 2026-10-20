@@ -22,12 +22,15 @@ The design is in [`docs/design.md`].
 
 ## Features
 
-No feature is on by default. On docs.rs, items that need a feature are
-marked with it.
+`std` is on by default and is what everything but [`Lang`], [`Catalog`]
+and [`Source`] needs; the other features enable it. On docs.rs, items that
+need a feature are marked with it.
 
 | Feature | Module | What it provides |
 |---|---|---|
-| *(none)* | | [`Lang`], [`Catalog`], [`Source`], [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
+| *(none)* | | [`Lang`], [`Catalog`] and [`Source`] |
+| `std` (default) | [`check`] | [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
+| `alloc` | | nothing yet; enabled by `std` |
 | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, `Phrases::store`, and numbers formatted in the handle's language |
 | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
 | `koine01` | [`koine01`] | conversions between [`Lang`] and koine 0.1's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |

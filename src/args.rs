@@ -113,6 +113,7 @@ where
 /// # let _ = args;
 /// ```
 #[macro_export]
+#[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "std")))]
 macro_rules! args {
     () => { $crate::Args::new() };
     ($($name:tt = $value:expr),+ $(,)?) => {{
@@ -124,6 +125,7 @@ macro_rules! args {
 
 #[doc(hidden)]
 #[macro_export]
+#[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "std")))]
 macro_rules! __args_name {
     ($name:ident) => {
         stringify!($name)

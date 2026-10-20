@@ -188,11 +188,15 @@ the versioned key `yew023` (`yew023 = { package = "yew", version = "0.23",
 optional = true }`) and so stays one crate. A later yew is another module and
 feature beside it (`yew024`).
 
-No feature is on by default.
+`std` is on by default; every other feature enables it. `alloc`, which
+`std` enables, adds nothing yet: the two exist so that a later
+alloc-only build is not a breaking change.
 
 | Feature | Enables | Pulls in |
 |---|---|---|
-| *(none)* | `Lang`, `Catalog`, `Source`, `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing |
+| *(none)* | `Lang`, `Catalog`, `Source` | nothing |
+| `std` (default) | `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing (with its `std`) |
+| `alloc` | nothing yet | nothing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
 | `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.1 (as `koine01`, feature `locale`) |
 | `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the no-provider helpers | yew 0.23 (as `yew023`) |

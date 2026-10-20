@@ -124,6 +124,7 @@ impl Catalog {
 
     /// Whether `id` (a message id, or a term id without its leading `-`) is
     /// inside this catalog's prefix.
+    #[cfg(feature = "std")]
     pub(crate) fn owns(&self, id: &str) -> bool {
         self.prefix.is_none_or(|prefix| id.starts_with(prefix))
     }

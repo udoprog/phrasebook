@@ -11,6 +11,12 @@ use unic_langid::LanguageIdentifier;
 
 use crate::{Args, Catalog, Lang, Phrases, Source};
 
+/// Whether `id` (a message id, or a term id without its leading `-`) is
+/// inside `catalog`'s prefix.
+pub(crate) fn owns(catalog: &Catalog, id: &str) -> bool {
+    catalog.prefix().is_none_or(|prefix| id.starts_with(prefix))
+}
+
 pub(crate) type Bundle = fluent_bundle::FluentBundle<FluentResource>;
 
 /// One language's resolved plain texts by id.
@@ -443,7 +449,7 @@ impl Inner {
             });
 
             for (key, name) in resource.entries().filter_map(entry_id) {
-                if !catalog.owns(name) {
+                if !owns(catalog, name) {
                     tracing::warn!(
                         catalog = catalog.name(),
                         %lang,
@@ -471,7 +477,7 @@ impl Inner {
                         // An earlier catalog defining an id inside a later
                         // catalog's prefix is an app overriding or
                         // translating a library's message on purpose.
-                        if catalog.prefix().is_some() && catalog.owns(name) {
+                        if catalog.prefix().is_some() && owns(catalog, name) {
                             tracing::debug!(
                                 catalog = catalog.name(),
                                 by = first,

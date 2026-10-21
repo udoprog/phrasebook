@@ -12,6 +12,9 @@
 //! * [`IntoPropValue`] from [`Lang`] into `AttrValue`, for an element's
 //!   `lang` attribute (the `Rc<str>` from [`Phrases::text`] already converts
 //!   into `AttrValue` and into children);
+//!
+//! The impls on [`Lang`] are phrasebook-catalog's, which defines `Lang`;
+//! this feature turns on its `yew023` feature.
 //! * [`html_around`], for markup where a translation places an argument,
 //!   such as a user's name in `<strong>`;
 //! * [`or_default`] and [`or_catalog`], the plain functions those are built
@@ -202,40 +205,22 @@
 //!
 //! [`ImplicitClone`]: yew023::html::ImplicitClone
 //! [`IntoPropValue`]: yew023::html::IntoPropValue
+//! [`Lang`]: crate::Lang
 
 use std::cell::Cell;
-use std::rc::Rc;
 
 use yew023::context::ContextHandle;
 use yew023::functional::{Hook, HookContext, use_context};
-use yew023::html::{BaseComponent, ImplicitClone, IntoPropValue, Scope};
-use yew023::virtual_dom::AttrValue;
+use yew023::html::{BaseComponent, ImplicitClone, Scope};
 use yew023::{Callback, Html};
 
-use crate::{Args, Catalog, Lang, Language, Phrases};
+use crate::{Args, Catalog, Language, Phrases};
 
 /// Cheap to clone: an `Rc` and a few words.
 impl ImplicitClone for Phrases {}
 
 /// `Copy`.
-impl ImplicitClone for Lang {}
-
-/// `Copy`.
 impl ImplicitClone for Language {}
-
-/// The language's tag, such as `sv-SE`, for an element's `lang` attribute.
-impl IntoPropValue<AttrValue> for Lang {
-    fn into_prop_value(self) -> AttrValue {
-        AttrValue::Rc(Rc::from(self.to_string()))
-    }
-}
-
-/// The language's tag, such as `sv-SE`, for an element's `lang` attribute.
-impl IntoPropValue<Option<AttrValue>> for Lang {
-    fn into_prop_value(self) -> Option<AttrValue> {
-        Some(self.into_prop_value())
-    }
-}
 
 thread_local! {
     static WARNED: Cell<bool> = const { Cell::new(false) };

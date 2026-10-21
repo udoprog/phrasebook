@@ -29,18 +29,18 @@ impl Source {
 /// Everything one crate ships: its name, the prefix every id it defines must
 /// start with (if any), and one [`Source`] per language.
 ///
-/// The first source is the catalog's default language, which
+/// The first source is the catalog's default language, which phrasebook's
 /// [`Phrases::from_catalog`] and [`Phrases::with_backstop`] fall back to.
 ///
-/// [`Phrases::from_catalog`]: crate::Phrases::from_catalog
-/// [`Phrases::with_backstop`]: crate::Phrases::with_backstop
+/// [`Phrases::from_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.from_catalog
+/// [`Phrases::with_backstop`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.with_backstop
 ///
 /// # Examples
 ///
 /// An app's catalog:
 ///
 /// ```
-/// use phrasebook::{Catalog, Lang, Source};
+/// use phrasebook_catalog::{Catalog, Lang, Source};
 ///
 /// const SV_SE: Lang = Lang::new("sv-SE");
 ///
@@ -55,7 +55,7 @@ impl Source {
 /// A library's, whose ids all start with its prefix:
 ///
 /// ```
-/// use phrasebook::{Catalog, Lang, Source};
+/// use phrasebook_catalog::{Catalog, Lang, Source};
 ///
 /// pub static L10N: Catalog = Catalog::new("watchword", &[
 ///     Source::new(Lang::EN_US, "watchword-sign-in = Sign in"),
@@ -83,8 +83,10 @@ impl Catalog {
     }
 
     /// Require every message and term id this catalog defines to start with
-    /// `prefix`. A violation is logged when a bundle is built and fails
-    /// [`check::catalog`](crate::check::catalog).
+    /// `prefix`. In phrasebook, a violation is logged when a bundle is built
+    /// and fails [`check::catalog`].
+    ///
+    /// [`check::catalog`]: https://docs.rs/phrasebook/latest/phrasebook/check/fn.catalog.html
     pub const fn with_prefix(self, prefix: &'static str) -> Catalog {
         Catalog {
             prefix: Some(prefix),
@@ -120,12 +122,5 @@ impl Catalog {
     /// The source for `lang`, the first if there are several.
     pub fn source(&self, lang: Lang) -> Option<&'static Source> {
         self.sources.iter().find(|s| s.lang == lang)
-    }
-
-    /// Whether `id` (a message id, or a term id without its leading `-`) is
-    /// inside this catalog's prefix.
-    #[cfg(feature = "std")]
-    pub(crate) fn owns(&self, id: &str) -> bool {
-        self.prefix.is_none_or(|prefix| id.starts_with(prefix))
     }
 }

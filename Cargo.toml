@@ -12,6 +12,10 @@ keywords = ["fluent", "i18n", "l10n", "localization", "wasm"]
 categories = ["internationalization", "localization", "wasm", "web-programming"]
 include = ["/src/**", "/tests/**", "/examples/tour.rs", "/README.md", "/LICENSE-*", "/Cargo.toml"]
 
+[workspace]
+members = ["crates/phrasebook-catalog"]
+exclude = ["examples/app"]
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(phrasebook_docsrs)'] }
 
@@ -24,10 +28,14 @@ default = ["std"]
 std = ["alloc", "dep:fluent-bundle", "dep:fluent-syntax", "dep:unic-langid", "dep:tracing", "tracing/std", "koine03?/std"]
 alloc = ["koine03?/alloc"]
 browser = ["std", "dep:web-sys", "dep:js-sys", "dep:wasm-bindgen", "dep:intl-memoizer"]
-yew023 = ["std", "dep:yew023"]
-koine03 = ["std", "dep:koine03"]
+yew023 = ["std", "dep:yew023", "phrasebook-catalog/yew023"]
+koine03 = ["std", "dep:koine03", "phrasebook-catalog/koine03"]
 
+# `Lang`, `Source` and `Catalog`, re-exported at the crate root. Not pinned:
+# it is released on its own, so a library's catalog outlives phrasebook's
+# breaking releases.
 [dependencies]
+phrasebook-catalog = { path = "crates/phrasebook-catalog", version = "0.1.0" }
 fluent-bundle = { version = "0.16.0", optional = true }
 fluent-syntax = { version = "0.12.0", optional = true }
 unic-langid = { version = "0.9.6", optional = true }

@@ -13,6 +13,12 @@
 //! which an app adds to its phrasebook and can override or translate, and
 //! which the library falls back to when the app provides nothing.
 //!
+//! [`Lang`], [`Catalog`] and [`Source`] are defined in their own crate,
+//! [phrasebook-catalog], and re-exported here. A library's catalog names
+//! that crate's `Catalog`, which changes far more rarely than phrasebook, so
+//! it survives phrasebook's breaking releases: an app moves to a new
+//! phrasebook without waiting for every library it uses to move with it.
+//!
 //! The design is in [`docs/design.md`].
 //!
 //! <br>
@@ -29,8 +35,8 @@
 //! | `std` (default) | [`check`] | [`Phrasebook`], [`Phrases`], [`Args`], [`Value`], [`args!`], and the [`check`] test helpers |
 //! | `alloc` | | nothing yet; enabled by `std` |
 //! | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, `Phrases::store`, and numbers formatted in the handle's language |
-//! | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
-//! | `koine03` | [`koine03`] | conversions between [`Lang`] and koine 0.3's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |
+//! | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle; turns on phrasebook-catalog's `yew023` for the impls on [`Lang`] |
+//! | `koine03` | [`koine03`] | conversions between [`Lang`] and koine 0.3's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine`; turns on phrasebook-catalog's `koine03` for the conversions |
 //!
 //! Fluent and unic-langid are used underneath but appear nowhere in the
 //! API, so upgrading them is never a breaking change. A dependency that is
@@ -38,6 +44,10 @@
 //! feature and module, so a later version can be added beside it.
 //!
 //! `yew023` does not enable `browser`; an app in the browser enables both.
+//!
+//! `yew023` and `koine03` forward to phrasebook-catalog's features of the
+//! same names, because only the crate that defines [`Lang`] may implement
+//! yew's and koine's traits for it.
 //!
 //! <br>
 //!
@@ -168,6 +178,7 @@
 //! [`or_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_catalog.html
 //! [`or_default`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_default.html
 //! [`Phrasebook`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrasebook.html
+//! [phrasebook-catalog]: https://docs.rs/phrasebook-catalog
 //! [`Phrases::msg`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.msg
 //! [`Phrases::text`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html#method.text
 //! [`Phrases`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Phrases.html
@@ -183,13 +194,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(all(test, not(feature = "std")))]
-extern crate std;
-
 #[cfg(feature = "std")]
 mod args;
-mod catalog;
-mod lang;
 #[cfg(feature = "std")]
 mod phrasebook;
 #[cfg(feature = "std")]
@@ -217,14 +223,14 @@ pub mod yew023;
 #[cfg(feature = "std")]
 #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "std")))]
 pub use self::args::{Args, Value, args};
-pub use self::catalog::{Catalog, Source};
-pub use self::lang::{Lang, ParseLangError};
 #[cfg(feature = "std")]
 #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "std")))]
 pub use self::phrasebook::{Builder, Language, Phrasebook};
 #[cfg(feature = "std")]
 #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "std")))]
 pub use self::phrases::{Around, Phrases};
+#[doc(inline)]
+pub use phrasebook_catalog::{Catalog, Lang, ParseLangError, Source};
 
 #[cfg(all(test, feature = "std"))]
 mod tests;

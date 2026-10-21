@@ -12,7 +12,7 @@ use core::str::FromStr;
 /// # Examples
 ///
 /// ```
-/// use phrasebook::Lang;
+/// use phrasebook_catalog::Lang;
 ///
 /// const SV_SE: Lang = Lang::new("sv-SE");
 ///
@@ -46,14 +46,14 @@ impl Lang {
     /// compile error. Use [`Lang::parse`] for tags from elsewhere.
     ///
     /// ```
-    /// use phrasebook::Lang;
+    /// use phrasebook_catalog::Lang;
     ///
     /// const SV_SE: Lang = Lang::new("sv-SE");
     /// const FIL: Lang = Lang::new("fil");
     /// ```
     ///
     /// ```compile_fail
-    /// use phrasebook::Lang;
+    /// use phrasebook_catalog::Lang;
     ///
     /// const BAD: Lang = Lang::new("sv_se");
     /// ```
@@ -97,7 +97,7 @@ impl Lang {
     /// Returns `None` unless the tag starts with two or three letters.
     ///
     /// ```
-    /// use phrasebook::Lang;
+    /// use phrasebook_catalog::Lang;
     ///
     /// assert_eq!(Lang::parse("en_gb"), Some(Lang::new("en-GB")));
     /// assert_eq!(Lang::parse("sv"), Some(Lang::new("sv")));
@@ -226,12 +226,12 @@ impl fmt::Debug for Lang {
 /// Parses as [`Lang::parse`] does.
 ///
 /// ```
-/// use phrasebook::Lang;
+/// use phrasebook_catalog::Lang;
 ///
 /// let lang: Lang = "sv-se".parse()?;
 /// assert_eq!(lang, Lang::new("sv-SE"));
 /// assert!("?".parse::<Lang>().is_err());
-/// # Ok::<_, phrasebook::ParseLangError>(())
+/// # Ok::<_, phrasebook_catalog::ParseLangError>(())
 /// ```
 impl FromStr for Lang {
     type Err = ParseLangError;

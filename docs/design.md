@@ -168,10 +168,22 @@ identifier that apps convert to and from.
 
 ### 2.1 Crates and features
 
-One crate, **phrasebook** (decided by the user, questions 3 and 5): the
-language identifier, catalogs, the dictionary, the `Phrases` handle,
-arguments, the browser helpers, and, behind the `yew023` feature, the
-`phrasebook::yew023` module for yew 0.23.
+Two crates. **phrasebook** (decided by the user, questions 3 and 5) has the
+dictionary, the `Phrases` handle, arguments, the browser helpers, and,
+behind the `yew023` feature, the `phrasebook::yew023` module for yew 0.23.
+**phrasebook-catalog** (`crates/phrasebook-catalog`, decision 10) has the
+language identifier and catalogs, `Lang`, `ParseLangError`, `Source` and
+`Catalog`, which phrasebook re-exports at its root, so apps and libraries
+name them as `phrasebook::Lang` and so on and need not depend on it
+themselves. It is `no_std`, needs neither `std` nor `alloc`, and has no
+dependencies by default.
+
+The trait impls on `Lang` for yew and koine live in phrasebook-catalog,
+behind its own `yew023` and `koine03` features: the orphan rule lets only
+the crate that defines `Lang` implement another crate's traits for it.
+phrasebook's features of the same names turn them on. A later yew or koine
+is then an additive feature on phrasebook-catalog beside the old one, not a
+breaking release of it.
 
 phrasebook ships no components. The context type is the handle itself, so
 an app provides it with yew's own `ContextProvider<Phrases>`, and a
@@ -196,12 +208,20 @@ alloc-only build is not a breaking change.
 
 | Feature | Enables | Pulls in |
 |---|---|---|
-| *(none)* | `Lang`, `Catalog`, `Source` | nothing |
+| *(none)* | `Lang`, `Catalog`, `Source` (re-exported from phrasebook-catalog) | phrasebook-catalog |
 | `std` (default) | `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing (with its `std`) |
 | `alloc` | nothing yet | nothing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
-| `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.3 (as `koine03`, feature `locale`) |
-| `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the `use_phrases` hooks, `PhrasesContext`, the no-provider helpers | yew 0.23 (as `yew023`) |
+| `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.3 (as `koine03`, feature `locale`); phrasebook-catalog's `koine03` |
+| `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the `use_phrases` hooks, `PhrasesContext`, the no-provider helpers | yew 0.23 (as `yew023`); phrasebook-catalog's `yew023` |
+
+phrasebook-catalog's own features:
+
+| Feature | Enables | Pulls in |
+|---|---|---|
+| *(none)* | `Lang`, `ParseLangError`, `Source`, `Catalog` | nothing |
+| `koine03` | `phrasebook_catalog::koine03`: `TryFrom` between `Lang` and koine's `Locale` and `Language`, `language`, `country`, `locale`, `lang`, and `Error`, all re-exported from `phrasebook::koine03` | koine 0.3 (as `koine03`, feature `locale`) |
+| `yew023` | `ImplicitClone` for `Lang`, `IntoPropValue` from `Lang` into `AttrValue` and `Option<AttrValue>` | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
 that appears in the public API is named after its version. fluent (0.17,
@@ -235,7 +255,8 @@ impl Lang {
 
 It is the shape of tag all three apps use (`language-REGION`), Copy and
 comparable like their `Locale`s, and canonicalizes to the string they already
-store (`en-US`). It is phrasebook's own type and not `koine::Locale`, although
+store (`en-US`). It is phrasebook's own type (defined in phrasebook-catalog,
+2.1) and not `koine::Locale`, although
 koine now has that compact identifier, because `koine::Locale` is validated
 against koine's tables: using it means linking koine's language table (about
 106k generated lines), which every app would carry in its wasm for a check its
@@ -244,6 +265,9 @@ behind `koine03`, where `Lang` converts to and from koine's `Locale`,
 `Language` and `Country` (see 2.8 and question 2).
 
 ### 2.3 Catalogs: an app's or a library's messages
+
+Both types are phrasebook-catalog's, re-exported by phrasebook (2.1 and
+decision 10).
 
 ```rust
 /// One language's `.ftl` source, embedded in the binary.
@@ -521,8 +545,11 @@ A `Lang` from koine spells its language as koine displays a `Locale`: the
 ISO 639-1 code where there is one, the ISO 639-3 code otherwise (`swe`
 becomes `sv`, `fil` stays `fil`), so `Lang` to `Locale` and back is the
 identity for every canonical tag koine knows. The conversions are trait impls
-on koine's types (allowed, since `Lang` is phrasebook's) and plain functions,
-not `From`, because neither direction is total.
+on koine's types and plain functions, not `From`, because neither direction
+is total. They, `Error` and the four plain conversion functions are
+phrasebook-catalog's, behind its `koine03` feature (the orphan rule allows
+the impls only in the crate that defines `Lang`), and `phrasebook::koine03`
+re-exports them beside `is_known` and `name`, so its API is unchanged.
 
 With `koine03` on, `Builder::build` warns about a declared language that is
 not `is_known`, and `Builder::language_named_by_koine(lang)` declares a
@@ -581,10 +608,11 @@ pub mod yew023 {
     // So the handle and language pass as props and context like yew's own
     // cheap values.
     impl ImplicitClone for Phrases {}
-    impl ImplicitClone for Lang {}
+    impl ImplicitClone for Lang {}     // phrasebook-catalog's `yew023`
     impl ImplicitClone for Language {}
     // For an element's `lang` attribute. `text`'s `Rc<str>` already
-    // converts into `AttrValue` and into children.
+    // converts into `AttrValue` and into children. Both are
+    // phrasebook-catalog's, behind its `yew023`.
     impl IntoPropValue<AttrValue> for Lang {}
     impl IntoPropValue<Option<AttrValue>> for Lang {}
 
@@ -879,6 +907,21 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    which the hooks use (2.10).
 9. **Bundles parse lazily, per language.** livemix's en-US is 3,256 lines;
    parsing languages nobody is reading only slows start-up.
+10. **Catalogs in their own crate, so they outlive phrasebook's breaking
+    releases.** A library such as watchword-yew023 ships its translations as
+    a `pub static L10N: Catalog`, and an app hands that catalog to its own
+    phrasebook. With `Catalog` defined in phrasebook, that only type-checks
+    when the app and every library use the same phrasebook major version, so
+    each breaking phrasebook release would make watchword and every app that
+    uses it bump together. `Lang`, `Source` and `Catalog` are plain const
+    data that rarely change, so they live in phrasebook-catalog, which can
+    reach 1.0 early, and phrasebook re-exports them: an app moves to a new
+    phrasebook while its libraries still build their catalogs against the
+    same phrasebook-catalog. The cost is a second crate to publish, and the
+    yew and koine impls on `Lang` moving with it (2.1). The alternatives were
+    accepting the lockstep, or `Builder::catalog` accepting older versions'
+    catalogs through conversion features, which is one crate but more code
+    with every release.
 
 ### Decisions by the user (2026-10-15, card ea9973ec)
 
@@ -896,3 +939,7 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
 6. (2026-10-15, via the foreman) The handle is named **`Phrases`**: the
    phrasebook open at the current language. `Phrasebook::l10n` is
    `Phrasebook::phrases`.
+7. (2026-10-21, card 7b3bf1bf) **`Lang`, `Source` and `Catalog` move to
+   phrasebook-catalog**, which phrasebook re-exports, so a library's catalog
+   survives phrasebook's breaking releases (decision 10). This revises
+   question 3's "one crate" for these types only.

@@ -104,7 +104,7 @@ fn check_source(catalog: &Catalog, source: &Source, report: &mut dyn FnMut(Strin
             report(format!("`{key}` is defined twice"));
         }
 
-        if !catalog.owns(name) {
+        if !crate::phrasebook::owns(catalog, name) {
             let prefix = catalog.prefix().unwrap_or_default();
             report(format!(
                 "`{key}` does not start with the catalog's prefix `{prefix}`"

@@ -18,9 +18,21 @@
 //! on phrasebook-catalog's `koine03` feature.
 //!
 //! With this feature on, [`Builder::build`] also warns about a declared
-//! language koine does not know (see [`is_known`]), and
-//! [`Builder::language_named_by_koine`] declares a language under koine's
-//! English reference name.
+//! language koine does not know (see [`is_known`]). An app with no name of
+//! a language in itself to hand can declare it under koine's English
+//! reference name, [`name`]:
+//!
+//! ```
+//! use phrasebook::{Lang, Phrasebook, koine03};
+//!
+//! const SV_SE: Lang = Lang::new("sv-SE");
+//!
+//! let book = Phrasebook::builder()
+//!     .language(SV_SE, koine03::name(SV_SE).unwrap_or("sv-SE"))
+//!     .build();
+//!
+//! assert_eq!(book.languages()[0].name(), "Swedish");
+//! ```
 //!
 //! ```
 //! # extern crate koine03 as koine;
@@ -48,7 +60,6 @@
 //! [`Language`]: ::koine03::Language
 //! [`Locale`]: ::koine03::Locale
 //! [`Builder::build`]: crate::Builder::build
-//! [`Builder::language_named_by_koine`]: crate::Builder::language_named_by_koine
 
 use crate::Lang;
 

@@ -73,7 +73,7 @@ fn main() {
     println!("Languages, for a picker:");
 
     for language in book.languages() {
-        println!("  {} ({})", language.name, language.lang);
+        println!("  {} ({})", language.name(), language.lang());
     }
 
     println!("Starting language for a browser preferring de, sv-FI, en:");

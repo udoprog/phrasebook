@@ -120,13 +120,13 @@ fn Picker(props: &PickerProps) -> Html {
 
     let options = phrases.languages().iter().map(|language| {
         let onclick = props.on_lang.reform({
-            let lang = language.lang;
+            let lang = language.lang();
             move |_| lang
         });
 
         html! {
-            <button {onclick} disabled={language.lang == phrases.lang()}>
-                {language.name}
+            <button {onclick} disabled={language.lang() == phrases.lang()}>
+                {language.name()}
             </button>
         }
     });

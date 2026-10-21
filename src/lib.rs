@@ -19,7 +19,8 @@
 //! it survives phrasebook's breaking releases: an app moves to a new
 //! phrasebook without waiting for every library it uses to move with it.
 //!
-//! The design is in [`docs/design.md`].
+//! The design is in [`docs/design.md`], including which dependencies appear
+//! in the API and what is deliberately left breaking-prone.
 //!
 //! <br>
 //!
@@ -36,7 +37,7 @@
 //! | `alloc` | | nothing yet; enabled by `std` |
 //! | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, `Phrases::store`, and numbers formatted in the handle's language |
 //! | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle; turns on phrasebook-catalog's `yew023` for the impls on [`Lang`] |
-//! | `koine03` | [`koine03`] | conversions between [`Lang`] and koine 0.3's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine`; turns on phrasebook-catalog's `koine03` for the conversions |
+//! | `koine03` | [`koine03`] | conversions between [`Lang`] and koine 0.3's `Language`, `Country` and `Locale`, koine's English names of languages (`koine03::name`), and a warning for declared languages koine does not know; turns on phrasebook-catalog's `koine03` for the conversions |
 //!
 //! Fluent and unic-langid are used underneath but appear nowhere in the
 //! API, so upgrading them is never a breaking change. A dependency that is

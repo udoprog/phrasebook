@@ -9,14 +9,19 @@ The language identifier and message catalog types of [phrasebook]:
 [`Lang`], [`Source`] and [`Catalog`]. They are plain `const` data, with
 no dependencies by default and no need for `std` or `alloc`.
 
-Use them through phrasebook, which re-exports them at its crate root as
-`phrasebook::{Lang, Source, Catalog, ParseLangError}`. They live in this
-crate of their own so that a library's catalog outlives phrasebook's
+An app uses them through phrasebook, which re-exports them at its crate
+root as `phrasebook::{Lang, Source, Catalog, ParseLangError}`. They live in
+this crate of their own so that a library's catalog outlives phrasebook's
 breaking releases: a library such as watchword ships its messages as a
 `pub static L10N: Catalog`, and an app hands that catalog to its own
-phrasebook. Both name this crate's `Catalog`, which changes far more
-rarely than phrasebook does, so an app can move to a new phrasebook
-without waiting for every library it uses to move with it.
+phrasebook. Both name this crate's `Catalog`, which changes far more rarely
+than phrasebook does, so an app can move to a new phrasebook without waiting
+for every library it uses to move with it.
+
+A library that only ships a catalog depends on this crate alone, with
+phrasebook as a dev-dependency for its `check` helpers in tests. A library
+whose components read the app's handle depends on phrasebook as well,
+since that handle, phrasebook's `Phrases`, is the context type.
 
 <br>
 

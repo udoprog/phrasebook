@@ -22,7 +22,9 @@ This document records:
    language choice, and how components call in, with where they differ;
 2. the API: layout and features, then each part;
 3. how livemix, mafia and army each wire it up and what each deletes;
-4. the decisions behind the API's shape, and the questions left open.
+4. the decisions behind the API's shape, and the questions left open;
+5. the API's seams: which dependencies appear in it, what can grow without
+   a breaking release, and what is deliberately left breaking-prone.
 
 The API sketches in section 2 match the crate as built. The crate docs (`src/lib.rs` and the items' own docs) are
 authoritative for the details, written in terms of behaviour rather than of
@@ -212,7 +214,7 @@ alloc-only build is not a breaking change.
 | `std` (default) | `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing (with its `std`) |
 | `alloc` | nothing yet | nothing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
-| `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.3 (as `koine03`, feature `locale`); phrasebook-catalog's `koine03` |
+| `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, koine's English names (`name`), `is_known` and the unknown-language warning | koine 0.3 (as `koine03`, feature `locale`); phrasebook-catalog's `koine03` |
 | `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the `use_phrases` hooks, `PhrasesContext`, the no-provider helpers | yew 0.23 (as `yew023`); phrasebook-catalog's `yew023` |
 
 phrasebook-catalog's own features:
@@ -337,9 +339,13 @@ impl Phrasebook {
 }
 
 /// A supported language and its name in itself, for a language picker.
-#[non_exhaustive]
-pub struct Language { pub lang: Lang, pub name: &'static str }
-impl Language { pub const fn new(lang: Lang, name: &'static str) -> Language; }
+/// Clone, not Copy, with private fields (see 5.3).
+pub struct Language { /* lang: Lang, name: &'static str */ }
+impl Language {
+    pub const fn new(lang: Lang, name: &'static str) -> Language;
+    pub fn lang(&self) -> Lang;
+    pub fn name(&self) -> &str;
+}
 
 impl Builder {
     /// Declare a supported language, in picker order. The first is the
@@ -552,10 +558,13 @@ the impls only in the crate that defines `Lang`), and `phrasebook::koine03`
 re-exports them beside `is_known` and `name`, so its API is unchanged.
 
 With `koine03` on, `Builder::build` warns about a declared language that is
-not `is_known`, and `Builder::language_named_by_koine(lang)` declares a
-language under koine's English name when an app has no endonym to hand. The
-name leaves out the region (`en-US` and `en-GB` are both "English"), and a
-language koine does not know is named by its tag, leaked once per call.
+not `is_known`. An app with no endonym to hand names a language with
+`koine03::name(lang)`, koine's English name, which leaves out the region
+(`en-US` and `en-GB` are both "English"):
+`.language(lang, koine03::name(lang).unwrap_or("..."))`. The builder had a
+`language_named_by_koine` method for this until the seam audit (5.3), which
+removed it: a koine-gated method outside the `koine03` module could not sit
+beside a later `koine04`, and it leaked a string for unknown languages.
 
 ### 2.9 Checks for an app's or library's tests
 
@@ -943,3 +952,133 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
    phrasebook-catalog**, which phrasebook re-exports, so a library's catalog
    survives phrasebook's breaking releases (decision 10). This revises
    question 3's "one crate" for these types only.
+
+## 5. API seams
+
+An audit before phrasebook 0.2.0 and phrasebook-catalog 0.1.0 (2026-10-21,
+card 4f1e29bb) of what in the public API would turn a dependency upgrade or
+an addition into a breaking release. Breaking changes are cheapest before
+the first release of each, so this is where they were made.
+
+### 5.1 Dependency types in the public API
+
+| Dependency | In the API? | Where |
+|---|---|---|
+| fluent-bundle, fluent-syntax | no | `Args` and `Value` wrap `FluentArgs` and `FluentValue` in private fields; `Phrases::number` takes an `f64` |
+| unic-langid, intl-memoizer | no | bundles are built from a `Lang` inside phrasebook |
+| web-sys, js-sys, wasm-bindgen | no | `browser` takes and returns `Lang`, `&str`, `String` and phrasebook's types, so it is unversioned |
+| tracing | no | log messages and their fields are diagnostics, not API |
+| yew | yes | only in `phrasebook::yew023` and phrasebook-catalog's `yew023` impls |
+| koine | yes | only in `phrasebook::koine03` and `phrasebook_catalog::koine03` |
+| phrasebook-catalog | yes | `Lang`, `ParseLangError`, `Source` and `Catalog`, re-exported at the root |
+
+The std types the API commits to are `Rc<str>` from `Phrases::text` (so a
+text converts into yew's `AttrValue` and children without a copy),
+`std::slice::Iter` as `&Problems`' iterator, and `String` in `Around`. `Rc`
+makes `Phrasebook` and `Phrases` neither `Send` nor `Sync`, which suits
+single-threaded wasm frontends.
+
+Features follow the versioned convention: `yew023` and `koine03` in both
+crates, and the same names on both sides so that phrasebook's forwards to
+phrasebook-catalog's. `std`, `alloc` and `browser` are unversioned because no
+type of their dependencies appears in the API.
+
+### 5.2 The phrasebook-catalog split
+
+Everything a library needs to define its catalog is in phrasebook-catalog:
+`Catalog`, `Source` and `Lang` are built in `const` context and need no
+feature, no `std` and no `alloc`. A library that only ships a catalog
+depends on phrasebook-catalog alone, with phrasebook as a dev-dependency for
+`check` in its tests. phrasebook-catalog's API is:
+
+- `Lang`: `EN_US`, `new` (const, panics on a non-canonical tag), `parse`,
+  `language`, `region`, `primary`, `FromStr` with `ParseLangError`,
+  `Display`, `Debug`, and the derived comparisons and hash;
+- `Source`: `new` (const), `lang`, `ftl`;
+- `Catalog`: `new` and `with_prefix` (const), `name`, `prefix`, `sources`,
+  `default_lang`, `languages`, `source`;
+- `koine03` and `yew023`: trait impls and conversions for those versions.
+
+Every struct has private fields, and catalog options are added as further
+`const fn with_*` methods beside `with_prefix`, so the crate grows without
+breaking. A later yew or koine is another feature beside the current one, a
+minor release.
+
+A library's *components* still depend on phrasebook, since the context type
+is `Phrases` (5.4).
+
+### 5.3 What the audit changed
+
+- **`Builder::language_named_by_koine` removed.** An inherent method gated
+  on `koine03` lives outside the versioned module, so it could not sit
+  beside a later `koine04`, and it leaked a string per unknown language.
+  `koine03::name(lang)` gives the same name:
+  `.language(lang, koine03::name(lang).unwrap_or("..."))`. No consumer used
+  it.
+- **`Language` has private fields, accessors and no `Copy`.** It was
+  `#[non_exhaustive]` with public `lang` and `name: &'static str`. Fields
+  could be added to it, but the name could never become owned, which a
+  language declared at runtime (from a server, say) needs. `lang()` and
+  `name() -> &str` read it now; it is `Clone` (and still `ImplicitClone`,
+  being cheap). An owned name can be added beside the `&'static str`
+  constructor later without a break. No consumer read the fields.
+
+Reviewed and kept:
+
+- `#[non_exhaustive]` remains on `ParseLangError` and on `Around`, a return
+  value whose two public fields callers destructure; every other public
+  struct has private fields. There are no public enums.
+- There are no public traits, so nothing to seal; the hooks return
+  `impl Hook<Output = Phrases>`.
+- `__args_name` is `#[doc(hidden)]` and exported only because `args!`
+  expands to it; it is not API.
+- `Builder` takes options as methods over private fields, so new options
+  are additions.
+- `check::Problem` and `Problems` have private fields. The wording of a
+  problem's message is for people reading a failed test and may change in
+  a minor release; its `catalog()` and `lang()` are the stable parts.
+
+### 5.4 Deliberately breaking-prone
+
+These were weighed and left as they are. Each makes some future change a
+breaking release.
+
+1. **`Phrases` is the yew context type.** A library's components read
+   `Phrases` from context, so a library and the app using it must share a
+   phrasebook major version: watchword-yew023 moves with phrasebook's major
+   releases even though its catalog does not. The alternative, an
+   object-safe lookup trait in phrasebook-catalog provided as the context,
+   would put `Args` and formatting into the crate meant to rarely change,
+   and every app would provide a trait object; the lockstep costs less while
+   the libraries are the user's own.
+2. **`Lang` is a language and a region.** `parse` drops script, variant and
+   extension subtags (`zh-Hant-TW` is `zh-TW`). The representation is
+   private, but adding scripts would change what `parse`, equality,
+   ordering and negotiation give for tags that have them, so it would be
+   phrasebook-catalog 0.2, and with it phrasebook's next major.
+3. **phrasebook re-exports phrasebook-catalog 0.1.** A phrasebook-catalog
+   0.2 is also a breaking phrasebook release, and splits libraries' catalogs
+   between the two until they move. phrasebook-catalog should reach 1.0
+   early (decision 10).
+4. **Language names are `&'static str` where they go in.**
+   `Builder::language`, `Builder::languages` and `Language::new` take
+   `&'static str`; owned names would be new methods beside these, not a
+   change to them.
+5. **`Phrases::text` returns `Rc<str>`** and `Phrases` is not `Send`.
+   Making it thread-safe would change the return type.
+6. **`Value`'s conversions.** Removing a `From` impl is breaking; adding one
+   is not, which is how booleans or dates would arrive.
+7. **`Around`'s fields** are a `String` and an `Option<String>`.
+
+### 5.5 Consumer follow-ups
+
+The audit's breaking changes (5.3) touch no code in watchword, livemix,
+mafia or army. Recommended, not forced:
+
+- **watchword-core** names `Catalog`, `Lang` and `Source` for its `L10N`
+  through a `phrasebook02` feature that pulls in all of phrasebook 0.2
+  (fluent, `std`). Depending on phrasebook-catalog 0.1 instead (feature
+  `phrasebook-catalog01`, `no_std`, no dependencies, phrasebook 0.2 kept as a
+  dev-dependency for `check::catalog`) keeps its `L10N` building unchanged
+  through phrasebook 0.3, which is what the split is for.
+  watchword-yew023 keeps depending on phrasebook, as 5.4 item 1 requires.

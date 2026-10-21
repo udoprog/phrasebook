@@ -26,19 +26,37 @@ type Texts = HashMap<Box<str>, Option<Rc<str>>>;
 type Selectors = Rc<[Box<str>]>;
 
 /// A supported language and its name in itself, for a language picker.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
+///
+/// Cheap to clone. Its fields are private so that a name can later be
+/// owned, for a language declared at runtime.
+///
+/// ```
+/// use phrasebook::{Lang, Language};
+///
+/// let language = Language::new(Lang::new("sv-SE"), "Svenska");
+/// assert_eq!(language.lang(), Lang::new("sv-SE"));
+/// assert_eq!(language.name(), "Svenska");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Language {
-    /// The language.
-    pub lang: Lang,
-    /// Its name in itself, such as `"Svenska"`.
-    pub name: &'static str,
+    lang: Lang,
+    name: &'static str,
 }
 
 impl Language {
-    /// A language and its name.
+    /// A language and its name in itself.
     pub const fn new(lang: Lang, name: &'static str) -> Language {
         Language { lang, name }
+    }
+
+    /// The language.
+    pub fn lang(&self) -> Lang {
+        self.lang
+    }
+
+    /// Its name in itself, such as `"Svenska"`.
+    pub fn name(&self) -> &str {
+        self.name
     }
 }
 
@@ -275,37 +293,6 @@ impl Builder {
         languages
             .into_iter()
             .fold(self, |builder, (lang, name)| builder.language(lang, name))
-    }
-
-    /// Declare a supported language named by koine's English reference
-    /// name, such as `"Swedish"` for `sv-SE`, for an app with no name of
-    /// the language in itself to hand. The region is not part of the name,
-    /// so an app declaring two regions of one language should name them
-    /// itself with [`Builder::language`].
-    ///
-    /// A language koine does not know is named by its tag (a string leaked
-    /// once per call, so declare it with [`Builder::language`] instead), and
-    /// [`Builder::build`] warns about it.
-    ///
-    /// ```
-    /// use phrasebook::{Lang, Phrasebook};
-    ///
-    /// let book = Phrasebook::builder()
-    ///     .language_named_by_koine(Lang::new("sv-SE"))
-    ///     .language(Lang::EN_US, "English")
-    ///     .build();
-    ///
-    /// assert_eq!(book.languages()[0].name, "Swedish");
-    /// ```
-    #[cfg(feature = "koine03")]
-    #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "koine03")))]
-    pub fn language_named_by_koine(self, lang: Lang) -> Self {
-        let name = match crate::koine03::name(lang) {
-            Some(name) => name,
-            None => Box::leak(lang.to_string().into_boxed_str()),
-        };
-
-        self.language(lang, name)
     }
 
     /// Set the fallback language, for a fallback other than the first

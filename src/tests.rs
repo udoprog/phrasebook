@@ -413,7 +413,7 @@ fn languages_and_negotiation() {
     let names = book
         .languages()
         .iter()
-        .map(|l| (l.lang, l.name))
+        .map(|l| (l.lang(), l.name()))
         .collect::<Vec<_>>();
     assert_eq!(names, [(Lang::EN_US, "English"), (SV_SE, "Svenska")]);
     assert_eq!(book.phrases(SV_SE).languages(), book.languages());
@@ -765,23 +765,24 @@ fn koine03_warns_about_unknown_languages() {
 
 #[cfg(feature = "koine03")]
 #[test]
-fn koine03_language_named_by_koine() {
+fn koine03_names() {
     let warnings = Warnings::default();
 
+    // An app naming its languages by koine, unknown ones by a placeholder.
     let book = with_default(warnings.clone(), || {
-        Phrasebook::builder()
-            .language_named_by_koine(SV_SE)
-            .language_named_by_koine(Lang::new("fil"))
-            .language_named_by_koine(Lang::new("xx-YY"))
-            // Already declared: keeps its name.
-            .language_named_by_koine(SV_SE)
-            .build()
+        let mut builder = Phrasebook::builder();
+
+        for lang in [SV_SE, Lang::new("fil"), Lang::new("xx-YY")] {
+            builder = builder.language(lang, crate::koine03::name(lang).unwrap_or("?"));
+        }
+
+        builder.build()
     });
 
     let names = book
         .languages()
         .iter()
-        .map(|l| (l.lang, l.name))
+        .map(|l| (l.lang(), l.name()))
         .collect::<Vec<_>>();
 
     assert_eq!(
@@ -789,7 +790,7 @@ fn koine03_language_named_by_koine() {
         [
             (SV_SE, "Swedish"),
             (Lang::new("fil"), "Filipino"),
-            (Lang::new("xx-YY"), "xx-YY"),
+            (Lang::new("xx-YY"), "?"),
         ]
     );
     assert_eq!(book.fallback(), SV_SE);

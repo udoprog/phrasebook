@@ -12,14 +12,14 @@
 //! * [`IntoPropValue`] from [`Lang`] into `AttrValue`, for an element's
 //!   `lang` attribute (the `Rc<str>` from [`Phrases::text`] already converts
 //!   into `AttrValue` and into children);
-//!
-//! The impls on [`Lang`] are phrasebook-catalog's, which defines `Lang`;
-//! this feature turns on its `yew023` feature.
 //! * [`html_around`], for markup where a translation places an argument,
 //!   such as a user's name in `<strong>`;
 //! * [`or_default`] and [`or_catalog`], the plain functions those are built
 //!   on, over the `Option<Phrases>` that `use_context` returns, for a
 //!   component rendered where nothing provides a handle.
+//!
+//! The impls on [`Lang`] are phrasebook-catalog's, which defines `Lang`;
+//! this feature turns on its `yew023` feature.
 //!
 //! # Providing the handle
 //!
@@ -113,9 +113,9 @@
 //!         .languages()
 //!         .iter()
 //!         .map(|language| {
-//!             let lang = language.lang;
+//!             let lang = language.lang();
 //!             let onclick = props.on_lang.reform(move |_| lang);
-//!             html! { <button {onclick}>{language.name}</button> }
+//!             html! { <button {onclick}>{language.name()}</button> }
 //!         })
 //!         .collect()
 //! }
@@ -219,7 +219,7 @@ use crate::{Args, Catalog, Language, Phrases};
 /// Cheap to clone: an `Rc` and a few words.
 impl ImplicitClone for Phrases {}
 
-/// `Copy`.
+/// Cheap to clone: a language and a `&'static str`.
 impl ImplicitClone for Language {}
 
 thread_local! {

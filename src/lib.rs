@@ -55,6 +55,7 @@
 //! ## Example
 //!
 //! ```rust
+//! # #[cfg(feature = "std")] {
 //! use phrasebook::{Catalog, Lang, Phrasebook, Source, args};
 //!
 //! const SV_SE: Lang = Lang::new("sv-SE");
@@ -89,6 +90,7 @@
 //!
 //! let phrases = phrases.with_lang(Lang::EN_US);
 //! assert_eq!(phrases.msg("players", &args!(count = "4")), "4 players");
+//! # }
 //! ```
 //!
 //! Pass numbers as numbers, not as strings formatted beforehand. With

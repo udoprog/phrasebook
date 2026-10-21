@@ -60,7 +60,7 @@ use crate::Lang;
 /// assert_eq!(koine03::language(Lang::new("xx")), None);
 /// ```
 pub fn language(lang: Lang) -> Option<Language> {
-    Language::from_iso(lang.language()).filter(|language| !language.is_default())
+    Language::from_code(lang.language())
 }
 
 /// The koine country of a [`Lang`]'s region, or `None` if it has no region
@@ -76,7 +76,7 @@ pub fn language(lang: Lang) -> Option<Language> {
 /// assert_eq!(koine03::country(Lang::new("en-ZZ")), None);
 /// ```
 pub fn country(lang: Lang) -> Option<Country> {
-    Country::from_iso(lang.region()?).filter(|country| !country.is_default())
+    Country::from_code(lang.region()?)
 }
 
 /// The koine locale of a [`Lang`], the same as [`Locale::try_from`]: `None`
@@ -115,8 +115,7 @@ pub fn locale(lang: Lang) -> Option<Locale> {
 /// assert_eq!(koine03::lang(Locale::DEFAULT), None);
 /// ```
 pub fn lang(locale: Locale) -> Option<Lang> {
-    let entry = locale.language().to_iso()?;
-    let language = entry.part1.unwrap_or(entry.id);
+    let language = locale.language().to_tag()?;
 
     let country = locale.country();
     let region = (!country.is_default()).then(|| country.as_str());
@@ -155,7 +154,7 @@ pub fn is_known(lang: Lang) -> bool {
 /// assert_eq!(koine03::name(Lang::new("xx")), None);
 /// ```
 pub fn name(lang: Lang) -> Option<&'static str> {
-    Some(language(lang)?.to_iso()?.name)
+    language(lang)?.name()
 }
 
 /// Fails if koine does not know the language, or the region when there is

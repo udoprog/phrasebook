@@ -198,7 +198,7 @@ alloc-only build is not a breaking change.
 | `std` (default) | `Phrasebook`, `Phrases`, `Args`, `Value`, `args!`, the `check` test helpers | fluent-bundle, fluent-syntax, unic-langid, tracing (with its `std`) |
 | `alloc` | nothing yet | nothing |
 | `browser` | `phrasebook::browser`: remembered language in localStorage, browser preferences; `Phrases::store`; numbers formatted through `Intl.NumberFormat` | web-sys, js-sys, wasm-bindgen, intl-memoizer (on wasm32 only) |
-| `koine01` | `phrasebook::koine01`: conversions between `Lang` and koine 0.1's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.1 (as `koine01`, feature `locale`) |
+| `koine03` | `phrasebook::koine03`: conversions between `Lang` and koine 0.3's `Language`, `Country` and `Locale`, the unknown-language warning, `Builder::language_named_by_koine` | koine 0.3 (as `koine03`, feature `locale`) |
 | `yew023` | `phrasebook::yew023`: trait impls on `Phrases`, `Lang` and `Language`, the no-provider helpers | yew 0.23 (as `yew023`) |
 
 **Versioned dependencies.** Per the user's convention, a pre-1.0 dependency
@@ -207,7 +207,7 @@ fluent-bundle 0.16) and unic-langid (0.9) are not 1.0 and are kept out of the
 API entirely: `Args`, `Value` and `Lang` are phrasebook's own types, so a
 fluent upgrade is an internal change rather than a `fluent017` feature. yew is
 in the API (its traits, implemented on `Phrases`), hence `yew023`. koine is
-not 1.0 and its types appear in the API, hence `koine01` (see 2.8). web-sys appears nowhere in the API, so
+not 1.0 and its types appear in the API, hence `koine03` (see 2.8). web-sys appears nowhere in the API, so
 `browser` is unversioned. tracing is an internal dependency.
 
 ### 2.2 `Lang`: a language identifier
@@ -238,7 +238,7 @@ koine now has that compact identifier, because `koine::Locale` is validated
 against koine's tables: using it means linking koine's language table (about
 106k generated lines), which every app would carry in its wasm for a check its
 own declaration already makes. So the core checks only the shape, and koine is
-behind `koine01`, where `Lang` converts to and from koine's `Locale`,
+behind `koine03`, where `Lang` converts to and from koine's `Locale`,
 `Language` and `Country` (see 2.8 and question 2).
 
 ### 2.3 Catalogs: an app's or a library's messages
@@ -481,7 +481,7 @@ users keep their choice across the switch. Detection reads the whole
 preferring `de, sv` gets Swedish from mafia instead of English. Outside wasm
 (an app's host-side tests and clippy) these return nothing and store nothing.
 
-### 2.8 koine (`koine01`)
+### 2.8 koine (`koine03`)
 
 koine (`~/repo/koine`, 0.1) has `Copy` value types over generated ISO
 tables: `koine::Language` (an ISO 639-3 code, four bytes), `koine::Country`
@@ -489,13 +489,13 @@ tables: `koine::Language` (an ISO 639-3 code, four bytes), `koine::Country`
 an optional country, eight bytes), each with a `DEFAULT` sentinel that names
 nothing, and the tables behind them (`language::by_part1`, `by_id`,
 `country::by_alpha2`, `locale::contains`, each entry with its codes and
-English `name`). phrasebook depends on it as `koine01` with
+English `name`). phrasebook depends on it as `koine03` with
 `default-features = false, features = ["locale"]` (which implies `language`
 and `country`), so a `Lang` converts to and from the compact types rather
 than the records the first draft of this section planned for.
 
 ```rust
-pub mod koine01 {
+pub mod koine03 {
     // Lang <-> koine; fails for an unknown language or region, and for a
     // DEFAULT sentinel.
     impl TryFrom<Lang> for koine::Locale { type Error = Error; }
@@ -522,7 +522,7 @@ identity for every canonical tag koine knows. The conversions are trait impls
 on koine's types (allowed, since `Lang` is phrasebook's) and plain functions,
 not `From`, because neither direction is total.
 
-With `koine01` on, `Builder::build` warns about a declared language that is
+With `koine03` on, `Builder::build` warns about a declared language that is
 not `is_known`, and `Builder::language_named_by_koine(lang)` declares a
 language under koine's English name when an app has no endonym to hand. The
 name leaves out the region (`en-US` and `en-GB` are both "English"), and a
@@ -865,7 +865,7 @@ pub(crate) fn lang(locale: Locale) -> Lang { Lang::parse(&locale.code()).expect(
 ### Decisions by the user (2026-10-15, card ea9973ec)
 
 1. The design is approved.
-2. koine is the optional `koine01` feature; the core checks only the tag's
+2. koine is the optional `koine03` feature; the core checks only the tag's
    shape.
 3. **One crate**, rather than a second phrasebook-yew023 crate: its
    `yew023` code needs no yew macros because it has no components (see 2.1).

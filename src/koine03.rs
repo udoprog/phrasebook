@@ -1,4 +1,4 @@
-//! Conversions between [`Lang`] and koine 0.1's compact identifiers.
+//! Conversions between [`Lang`] and koine 0.3's compact identifiers.
 //!
 //! [koine] has `Copy` value types over the ISO tables: a [`Language`]
 //! (ISO 639-3), a [`Country`] (ISO 3166-1 alpha-2) and a [`Locale`] (a
@@ -18,10 +18,10 @@
 //! English reference name.
 //!
 //! ```
-//! # extern crate koine01 as koine;
+//! # extern crate koine03 as koine;
 //! use koine::{Country, Language, Locale};
 //! use phrasebook::Lang;
-//! use phrasebook::koine01;
+//! use phrasebook::koine03;
 //!
 //! const SV_SE: Lang = Lang::new("sv-SE");
 //!
@@ -30,34 +30,34 @@
 //! assert_eq!(locale.country(), Country::new(b"SE"));
 //! assert_eq!(Lang::try_from(locale)?, SV_SE);
 //!
-//! assert_eq!(koine01::country(SV_SE), Some(Country::new(b"SE")));
-//! assert_eq!(koine01::name(SV_SE), Some("Swedish"));
-//! assert!(koine01::is_known(SV_SE));
-//! assert!(!koine01::is_known(Lang::new("sv-US")));
+//! assert_eq!(koine03::country(SV_SE), Some(Country::new(b"SE")));
+//! assert_eq!(koine03::name(SV_SE), Some("Swedish"));
+//! assert!(koine03::is_known(SV_SE));
+//! assert!(!koine03::is_known(Lang::new("sv-US")));
 //! assert!(Locale::try_from(Lang::new("xx")).is_err());
-//! # Ok::<_, koine01::Error>(())
+//! # Ok::<_, koine03::Error>(())
 //! ```
 //!
-//! [koine]: https://docs.rs/koine/0.1
+//! [koine]: https://docs.rs/koine/0.3
 //! [`Builder::build`]: crate::Builder::build
 //! [`Builder::language_named_by_koine`]: crate::Builder::language_named_by_koine
 
 use core::fmt;
 
-use ::koine01::{Country, Language, Locale};
+use ::koine03::{Country, Language, Locale};
 
 use crate::Lang;
 
 /// The koine language of a [`Lang`], or `None` if koine does not know it.
 ///
 /// ```
-/// # extern crate koine01 as koine;
+/// # extern crate koine03 as koine;
 /// use koine::Language;
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert_eq!(koine01::language(Lang::EN_US), Some(Language::ENG));
-/// assert_eq!(koine01::language(Lang::new("fil")), Some(Language::new(b"fil")));
-/// assert_eq!(koine01::language(Lang::new("xx")), None);
+/// assert_eq!(koine03::language(Lang::EN_US), Some(Language::ENG));
+/// assert_eq!(koine03::language(Lang::new("fil")), Some(Language::new(b"fil")));
+/// assert_eq!(koine03::language(Lang::new("xx")), None);
 /// ```
 pub fn language(lang: Lang) -> Option<Language> {
     Language::from_iso(lang.language()).filter(|language| !language.is_default())
@@ -67,13 +67,13 @@ pub fn language(lang: Lang) -> Option<Language> {
 /// or koine does not know it.
 ///
 /// ```
-/// # extern crate koine01 as koine;
+/// # extern crate koine03 as koine;
 /// use koine::Country;
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert_eq!(koine01::country(Lang::EN_US), Some(Country::US));
-/// assert_eq!(koine01::country(Lang::new("en")), None);
-/// assert_eq!(koine01::country(Lang::new("en-ZZ")), None);
+/// assert_eq!(koine03::country(Lang::EN_US), Some(Country::US));
+/// assert_eq!(koine03::country(Lang::new("en")), None);
+/// assert_eq!(koine03::country(Lang::new("en-ZZ")), None);
 /// ```
 pub fn country(lang: Lang) -> Option<Country> {
     Country::from_iso(lang.region()?).filter(|country| !country.is_default())
@@ -86,12 +86,12 @@ pub fn country(lang: Lang) -> Option<Country> {
 /// [`is_known`]'s question.
 ///
 /// ```
-/// # extern crate koine01 as koine;
+/// # extern crate koine03 as koine;
 /// use koine::Locale;
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert_eq!(koine01::locale(Lang::EN_US), Some(Locale::EN_US));
-/// assert_eq!(koine01::locale(Lang::new("en-ZZ")), None);
+/// assert_eq!(koine03::locale(Lang::EN_US), Some(Locale::EN_US));
+/// assert_eq!(koine03::locale(Lang::new("en-ZZ")), None);
 /// ```
 pub fn locale(lang: Lang) -> Option<Locale> {
     let country = match lang.region() {
@@ -106,13 +106,13 @@ pub fn locale(lang: Lang) -> Option<Locale> {
 /// for [`Locale::DEFAULT`].
 ///
 /// ```
-/// # extern crate koine01 as koine;
+/// # extern crate koine03 as koine;
 /// use koine::{Country, Language, Locale};
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert_eq!(koine01::lang(Locale::EN_US), Some(Lang::EN_US));
-/// assert_eq!(koine01::lang(Locale::new(Language::new(b"fil"), Country::DEFAULT)), Some(Lang::new("fil")));
-/// assert_eq!(koine01::lang(Locale::DEFAULT), None);
+/// assert_eq!(koine03::lang(Locale::EN_US), Some(Lang::EN_US));
+/// assert_eq!(koine03::lang(Locale::new(Language::new(b"fil"), Country::DEFAULT)), Some(Lang::new("fil")));
+/// assert_eq!(koine03::lang(Locale::DEFAULT), None);
 /// ```
 pub fn lang(locale: Locale) -> Option<Lang> {
     let entry = locale.language().to_iso()?;
@@ -129,12 +129,12 @@ pub fn lang(locale: Locale) -> Option<Lang> {
 /// lists as a valid locale.
 ///
 /// ```
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert!(koine01::is_known(Lang::new("sv")));
-/// assert!(koine01::is_known(Lang::new("sv-FI")));
-/// assert!(!koine01::is_known(Lang::new("sv-JP")));
-/// assert!(!koine01::is_known(Lang::new("xx")));
+/// assert!(koine03::is_known(Lang::new("sv")));
+/// assert!(koine03::is_known(Lang::new("sv-FI")));
+/// assert!(!koine03::is_known(Lang::new("sv-JP")));
+/// assert!(!koine03::is_known(Lang::new("xx")));
 /// ```
 pub fn is_known(lang: Lang) -> bool {
     match locale(lang) {
@@ -149,10 +149,10 @@ pub fn is_known(lang: Lang) -> bool {
 /// and `en-GB` are both `"English"`.
 ///
 /// ```
-/// use phrasebook::{Lang, koine01};
+/// use phrasebook::{Lang, koine03};
 ///
-/// assert_eq!(koine01::name(Lang::new("sv-SE")), Some("Swedish"));
-/// assert_eq!(koine01::name(Lang::new("xx")), None);
+/// assert_eq!(koine03::name(Lang::new("sv-SE")), Some("Swedish"));
+/// assert_eq!(koine03::name(Lang::new("xx")), None);
 /// ```
 pub fn name(lang: Lang) -> Option<&'static str> {
     Some(language(lang)?.to_iso()?.name)
@@ -189,7 +189,7 @@ impl TryFrom<Locale> for Lang {
 /// A [`Lang`] without a region. Fails for [`Language::DEFAULT`].
 ///
 /// ```
-/// # extern crate koine01 as koine;
+/// # extern crate koine03 as koine;
 /// use koine::Language;
 /// use phrasebook::Lang;
 ///
@@ -229,7 +229,7 @@ impl core::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
-    use ::koine01::{Country, Language, Locale};
+    use ::koine03::{Country, Language, Locale};
 
     use super::*;
 
@@ -297,7 +297,7 @@ mod tests {
             assert_eq!(locale.to_string(), tag, "{tag}");
         }
 
-        for locale in ::koine01::locale::iter().step_by(13) {
+        for locale in ::koine03::locale::iter().step_by(13) {
             let locale = Locale::new(
                 Language::new(locale.language.as_bytes()),
                 Country::new(locale.country.as_bytes()),

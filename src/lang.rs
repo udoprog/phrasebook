@@ -142,7 +142,7 @@ impl Lang {
     /// Build from a language code of two or three ASCII letters and an
     /// optional region of two, in any case. Returns `None` for any other
     /// shape.
-    #[cfg(feature = "koine01")]
+    #[cfg(feature = "koine03")]
     pub(crate) fn from_parts(language: &str, region: Option<&str>) -> Option<Lang> {
         let language_bytes = language.as_bytes();
 

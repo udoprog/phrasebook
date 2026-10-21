@@ -291,10 +291,10 @@ impl Builder {
     ///
     /// assert_eq!(book.languages()[0].name, "Swedish");
     /// ```
-    #[cfg(feature = "koine01")]
-    #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "koine01")))]
+    #[cfg(feature = "koine03")]
+    #[cfg_attr(phrasebook_docsrs, doc(cfg(feature = "koine03")))]
     pub fn language_named_by_koine(self, lang: Lang) -> Self {
-        let name = match crate::koine01::name(lang) {
+        let name = match crate::koine03::name(lang) {
             Some(name) => name,
             None => Box::leak(lang.to_string().into_boxed_str()),
         };
@@ -348,13 +348,13 @@ impl Builder {
 
     /// Build the phrasebook. Nothing is parsed yet.
     ///
-    /// With the `koine01` feature, a declared language koine does not know
-    /// (see [`koine01::is_known`](crate::koine01::is_known)) is logged as a
+    /// With the `koine03` feature, a declared language koine does not know
+    /// (see [`koine03::is_known`](crate::koine03::is_known)) is logged as a
     /// warning.
     pub fn build(self) -> Phrasebook {
-        #[cfg(feature = "koine01")]
+        #[cfg(feature = "koine03")]
         for language in &self.languages {
-            if !crate::koine01::is_known(language.lang) {
+            if !crate::koine03::is_known(language.lang) {
                 tracing::warn!(lang = %language.lang, "phrasebook: koine does not know the declared language");
             }
         }

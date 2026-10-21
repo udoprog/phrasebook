@@ -33,7 +33,7 @@ need a feature are marked with it.
 | `alloc` | | nothing yet; enabled by `std` |
 | `browser` | [`browser`] | the language remembered in localStorage, the browser's preferred languages, `Phrases::store`, and numbers formatted in the handle's language |
 | `yew023` | [`yew023`] | yew 0.23: `ImplicitClone` and `IntoPropValue` impls, and the [`or_default`] and [`or_catalog`] helpers for components rendered without a provided handle |
-| `koine01` | [`koine01`] | conversions between [`Lang`] and koine 0.1's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |
+| `koine03` | [`koine03`] | conversions between [`Lang`] and koine 0.3's `Language`, `Country` and `Locale`, a warning for declared languages koine does not know, and `Builder::language_named_by_koine` |
 
 Fluent and unic-langid are used underneath but appear nowhere in the
 API, so upgrading them is never a breaking change. A dependency that is
@@ -163,7 +163,7 @@ cd examples/app && trunk serve
 [`docs/design.md`]: https://github.com/udoprog/phrasebook/blob/main/docs/design.md
 [`examples/app`]: https://github.com/udoprog/phrasebook/tree/main/examples/app
 [`examples/tour.rs`]: https://github.com/udoprog/phrasebook/blob/main/examples/tour.rs
-[`koine01`]: https://docs.rs/phrasebook/latest/phrasebook/koine01/index.html
+[`koine03`]: https://docs.rs/phrasebook/latest/phrasebook/koine03/index.html
 [`Lang`]: https://docs.rs/phrasebook/latest/phrasebook/struct.Lang.html
 [`or_catalog`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_catalog.html
 [`or_default`]: https://docs.rs/phrasebook/latest/phrasebook/yew023/fn.or_default.html

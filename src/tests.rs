@@ -736,9 +736,9 @@ fn has_catalog() {
     assert!(!book.has_catalog(&LIB));
 }
 
-#[cfg(feature = "koine01")]
+#[cfg(feature = "koine03")]
 #[test]
-fn koine01_warns_about_unknown_languages() {
+fn koine03_warns_about_unknown_languages() {
     let warnings = Warnings::default();
 
     with_default(warnings.clone(), || {
@@ -763,9 +763,9 @@ fn koine01_warns_about_unknown_languages() {
     assert_eq!(warnings.count(), 3);
 }
 
-#[cfg(feature = "koine01")]
+#[cfg(feature = "koine03")]
 #[test]
-fn koine01_language_named_by_koine() {
+fn koine03_language_named_by_koine() {
     let warnings = Warnings::default();
 
     let book = with_default(warnings.clone(), || {
